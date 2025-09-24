@@ -1,0 +1,14 @@
+{
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  },
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/*.js.map": true
+  },
+  "typescript.validate.enable": true,
+  "typescript.format.enable": true
+}

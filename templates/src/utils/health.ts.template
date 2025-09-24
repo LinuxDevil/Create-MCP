@@ -1,0 +1,57 @@
+export interface HealthStatus {
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  checks: HealthCheck[];
+  timestamp: string;
+}
+
+export interface HealthCheck {
+  name: string;
+  status: 'pass' | 'fail' | 'warn';
+  message?: string;
+  duration?: number;
+}
+
+export class HealthChecker {
+  private checks: Map<string, () => Promise<HealthCheck>> = new Map();
+
+  registerCheck(name: string, check: () => Promise<HealthCheck>): void {
+    this.checks.set(name, check);
+  }
+
+  async getStatus(): Promise<HealthStatus> {
+    const results: HealthCheck[] = [];
+    
+    for (const [name, check] of this.checks) {
+      const start = Date.now();
+      try {
+        const result = await check();
+        result.duration = Date.now() - start;
+        results.push(result);
+      } catch (error) {
+        results.push({
+          name,
+          status: 'fail',
+          message: error instanceof Error ? error.message : 'Unknown error',
+          duration: Date.now() - start
+        });
+      }
+    }
+
+    const status = this.determineOverallStatus(results);
+    
+    return {
+      status,
+      checks: results,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  private determineOverallStatus(checks: HealthCheck[]): 'healthy' | 'degraded' | 'unhealthy' {
+    const hasFailure = checks.some(check => check.status === 'fail');
+    const hasWarning = checks.some(check => check.status === 'warn');
+
+    if (hasFailure) return 'unhealthy';
+    if (hasWarning) return 'degraded';
+    return 'healthy';
+  }
+}

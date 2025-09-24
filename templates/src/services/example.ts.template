@@ -1,0 +1,288 @@
+import { logger } from '../utils/logger.js';
+
+export interface ServerStatus {
+  uptime: number;
+  version: string;
+  name: string;
+  timestamp: string;
+  memory: {
+    used: number;
+    total: number;
+    external: number;
+  };
+  process: {
+    pid: number;
+    platform: string;
+    arch: string;
+    nodeVersion: string;
+  };
+  capabilities: string[];
+}
+
+/**
+ * Example service demonstrating business logic separation
+ * from the MCP server implementation.
+ */
+export class ExampleService {
+  private startTime: number;
+  private processingStats: Map<string, number> = new Map();
+
+  constructor() {
+    this.startTime = Date.now();
+    logger.info('ExampleService initialized');
+  }
+
+  /**
+   * Get the current server status
+   */
+  async getStatus(): Promise<ServerStatus> {
+    logger.debug('Getting server status');
+
+    const memUsage = process.memoryUsage();
+    
+    return {
+      uptime: Date.now() - this.startTime,
+      version: '1.0.0',
+      name: '{{PROJECT_NAME}}',
+      timestamp: new Date().toISOString(),
+      memory: {
+        used: Math.round(memUsage.heapUsed / 1024 / 1024), // MB
+        total: Math.round(memUsage.heapTotal / 1024 / 1024), // MB
+        external: Math.round(memUsage.external / 1024 / 1024), // MB
+      },
+      process: {
+        pid: process.pid,
+        platform: process.platform,
+        arch: process.arch,
+        nodeVersion: process.version
+      },
+      capabilities: ['tools', 'resources', 'prompts']
+    };
+  }
+
+  /**
+   * Example async operation with error handling
+   */
+  async processData(data: string, format: 'json' | 'csv' | 'text'): Promise<any> {
+    logger.info(`Processing ${format} data`);
+    
+    try {
+      switch (format) {
+        case 'json':
+          return JSON.parse(data);
+        case 'csv':
+          return this.parseCsv(data);
+        case 'text':
+          return { text: data, wordCount: data.split(/\s+/).length };
+        default:
+          throw new Error(`Unsupported format: ${format}`);
+      }
+    } catch (error) {
+      logger.error(`Error processing ${format} data:`, error);
+      throw error;
+    }
+  }
+
+  private parseCsv(data: string): any[] {
+    const lines = data.trim().split('\n');
+    if (lines.length === 0) return [];
+
+    const headers = lines[0].split(',').map(h => h.trim());
+    const rows = lines.slice(1).map(line => {
+      const values = line.split(',').map(v => v.trim());
+      const row: any = {};
+      headers.forEach((header, index) => {
+        row[header] = values[index] || '';
+      });
+      return row;
+    });
+
+    return rows;
+  }
+
+  /**
+   * Get processing statistics
+   */
+  getProcessingStats(): Record<string, number> {
+    return Object.fromEntries(this.processingStats);
+  }
+
+  /**
+   * Reset processing statistics
+   */
+  resetProcessingStats(): void {
+    this.processingStats.clear();
+    logger.info('Processing statistics reset');
+  }
+
+  /**
+   * Update processing statistics
+   */
+  private updateStats(format: string): void {
+    const current = this.processingStats.get(format) || 0;
+    this.processingStats.set(format, current + 1);
+  }
+
+  /**
+   * Enhanced CSV parser with better error handling
+   */
+  private parseAdvancedCsv(data: string): any[] {
+    const lines = data.trim().split('\n');
+    if (lines.length === 0) return [];
+    
+    const headers = lines[0].split(',').map(h => h.trim());
+    const rows = lines.slice(1).map((line, index) => {
+      try {
+        const values = this.parseCsvLine(line);
+        const row: any = { _rowIndex: index + 1 };
+        
+        headers.forEach((header, colIndex) => {
+          row[header] = values[colIndex] || '';
+        });
+        
+        return row;
+      } catch (error) {
+        throw new Error(`Error parsing CSV row ${index + 2}: ${error instanceof Error ? error.message : 'Parse error'}`);
+      }
+    });
+
+    return rows;
+  }
+
+  /**
+   * Parse CSV line with quote handling
+   */
+  private parseCsvLine(line: string): string[] {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    
+    result.push(current.trim());
+    return result;
+  }
+
+  /**
+   * Enhanced text analysis
+   */
+  private analyzeText(data: string): any {
+    const lines = data.split('\n');
+    const words = data.split(/\s+/).filter(word => word.length > 0);
+    const characters = data.length;
+    const paragraphs = data.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+
+    // Basic text analysis
+    const wordFrequency = words.reduce((freq: Record<string, number>, word) => {
+      const cleanWord = word.toLowerCase().replace(/[^\w]/g, '');
+      if (cleanWord.length > 0) {
+        freq[cleanWord] = (freq[cleanWord] || 0) + 1;
+      }
+      return freq;
+    }, {});
+
+    // Find most common words
+    const topWords = Object.entries(wordFrequency)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 10)
+      .map(([word, count]) => ({ word, count }));
+
+    return {
+      content: data,
+      statistics: {
+        characters,
+        charactersNoSpaces: data.replace(/\s/g, '').length,
+        words: words.length,
+        lines: lines.length,
+        paragraphs: paragraphs.length,
+        averageWordsPerLine: Math.round((words.length / lines.length) * 100) / 100,
+        averageCharactersPerWord: Math.round((characters / words.length) * 100) / 100
+      },
+      analysis: {
+        topWords,
+        uniqueWords: Object.keys(wordFrequency).length,
+        readingTimeMinutes: Math.ceil(words.length / 200) // Assuming 200 WPM reading speed
+      }
+    };
+  }
+
+  /**
+   * Enhanced JSON analysis
+   */
+  private analyzeJson(data: any, depth = 0): any {
+    if (depth > 10) return { type: 'deep-nested', depth };
+
+    if (data === null) return { type: 'null' };
+    if (typeof data === 'boolean') return { type: 'boolean', value: data };
+    if (typeof data === 'number') return { type: 'number', value: data };
+    if (typeof data === 'string') return { type: 'string', length: data.length };
+    
+    if (Array.isArray(data)) {
+      return {
+        type: 'array',
+        length: data.length,
+        elementTypes: data.length > 0 ? this.analyzeJson(data[0], depth + 1) : null
+      };
+    }
+    
+    if (typeof data === 'object') {
+      const keys = Object.keys(data);
+      return {
+        type: 'object',
+        keyCount: keys.length,
+        keys: keys.slice(0, 10), // Limit to first 10 keys
+        structure: keys.slice(0, 5).reduce((acc: any, key) => {
+          acc[key] = this.analyzeJson(data[key], depth + 1);
+          return acc;
+        }, {})
+      };
+    }
+    
+    return { type: typeof data };
+  }
+
+  /**
+   * Process data with enhanced analysis
+   */
+  async processDataAdvanced(data: string, format: 'json' | 'csv' | 'text'): Promise<any> {
+    this.updateStats(format);
+    
+    try {
+      switch (format) {
+        case 'json':
+          const parsed = JSON.parse(data);
+          return {
+            originalData: parsed,
+            analysis: this.analyzeJson(parsed)
+          };
+        case 'csv':
+          return this.parseAdvancedCsv(data);
+        case 'text':
+          return this.analyzeText(data);
+        default:
+          throw new Error(`Unsupported format: ${format}`);
+      }
+    } catch (error) {
+      logger.error(`Error processing ${format} data:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cleanup method for proper resource disposal
+   */
+  dispose(): void {
+    logger.info('ExampleService disposed');
+  }
+}

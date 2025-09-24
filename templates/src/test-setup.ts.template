@@ -1,0 +1,15 @@
+// Jest test setup file
+import { logger } from './utils/logger.js';
+import { LogLevel } from './utils/logger.js';
+
+// Silence logs during testing
+logger.setLevel(LogLevel.ERROR);
+
+// Global test configuration
+beforeEach(() => {
+  // Reset any global state before each test
+});
+
+afterEach(() => {
+  // Cleanup after each test
+});

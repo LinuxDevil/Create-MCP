@@ -1,0 +1,285 @@
+# {{PROJECT_NAME}}
+
+{{PROJECT_DESCRIPTION}}
+
+A Model Context Protocol (MCP) server built with TypeScript, providing both Stdio and HTTP transport support.
+
+## Features
+
+- 🚀 **Dual Transport Support**: Both Stdio and HTTP transports
+- 🛠️ **Example Tools**: Pre-built tools for common operations
+- 📚 **Resources**: Static and dynamic resource examples
+- 💬 **Prompts**: Ready-to-use prompt templates
+- 🔧 **Type Safety**: Full TypeScript support with Zod validation
+- 📝 **Comprehensive Logging**: Built-in logging utilities
+- ⚡ **Hot Reload**: Development mode with automatic restarts
+- 🏥 **Health Monitoring**: Built-in health checks and system monitoring
+
+## Quick Start
+
+### Installation
+
+```bash
+npm install
+```
+
+### Development
+
+#### Stdio Transport (for CLI tools)
+```bash
+npm run dev:stdio
+```
+
+#### HTTP Transport (for web services)
+```bash
+npm run dev:http
+```
+
+The HTTP server will start on `http://localhost:3000` with the following endpoints:
+- `POST /mcp` - MCP communication
+- `GET /mcp` - Server-Sent Events for notifications
+- `DELETE /mcp` - Session termination
+- `GET /health` - Health check
+- `GET /info` - Server information
+
+### Production
+
+```bash
+npm run build
+npm start
+```
+
+## Usage Examples
+
+### Using with Claude Desktop
+
+Add to your Claude Desktop configuration:
+
+```json
+{
+  "mcpServers": {
+    "{{PROJECT_NAME}}": {
+      "command": "node",
+      "args": ["path/to/{{PROJECT_NAME}}/dist/server.js"]
+    }
+  }
+}
+```
+
+### Using with HTTP Transport
+
+```bash
+# Start HTTP server
+npm run dev:http
+
+# Test with curl
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+## Available Tools
+
+- **echo**: Echo back messages
+- **add**: Add two numbers
+- **get-status**: Get server status
+
+## Available Resources
+
+- **info://server**: Server information
+- **greeting://{name}**: Dynamic greetings
+
+## Available Prompts
+
+- **analyze-data**: Data analysis prompt template
+
+## Project Structure
+
+```
+src/
+├── services/          # Business logic and services
+│   └── example.ts     # Example service implementation
+├── utils/            # Utility functions
+│   ├── logger.ts     # Logging utility
+│   └── health.ts     # Health monitoring
+└── server.ts         # Main server implementation
+```
+
+## Configuration
+
+Environment variables in `.env.local`:
+
+- `MCP_TRANSPORT`: Transport mode (`stdio` or `http`)
+- `PORT`: HTTP server port (default: 3000)
+- `LOG_LEVEL`: Logging level (`DEBUG`, `INFO`, `WARN`, `ERROR`)
+- `NODE_ENV`: Node environment (`development` or `production`)
+
+## Development
+
+### Adding New Tools
+
+```typescript
+this.server.registerTool(
+  "my-tool",
+  {
+    title: "My Tool",
+    description: "Description of what the tool does",
+    inputSchema: {
+      param: z.string().describe("Parameter description")
+    }
+  },
+  async ({ param }) => {
+    // Tool implementation
+    return {
+      content: [{
+        type: "text",
+        text: `Result: ${param}`
+      }]
+    };
+  }
+);
+```
+
+### Adding New Resources
+
+```typescript
+this.server.registerResource(
+  "my-resource",
+  "my-resource://path",
+  {
+    title: "My Resource",
+    description: "Resource description"
+  },
+  async () => ({
+    contents: [{
+      uri: "my-resource://path",
+      text: "Resource content"
+    }]
+  })
+);
+```
+
+### Adding Dynamic Resources
+
+```typescript
+this.server.registerResource(
+  "dynamic-resource",
+  new ResourceTemplate("dynamic://{id}/{type?}", { list: undefined }),
+  {
+    title: "Dynamic Resource",
+    description: "Resource with URL parameters"
+  },
+  async (uri, { id, type = "default" }) => ({
+    contents: [{
+      uri: uri.href,
+      text: `Resource ${id} of type ${type}`
+    }]
+  })
+);
+```
+
+## Testing
+
+```bash
+# Run tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
+```
+
+## Linting
+
+```bash
+npm run lint
+npm run lint:fix
+```
+
+## Health Monitoring
+
+The server includes built-in health monitoring accessible via:
+
+- **HTTP endpoint**: `GET /health`
+- **Tool**: `get-status` tool
+- **Programmatic**: `HealthChecker` class
+
+### Custom Health Checks
+
+```typescript
+// Add custom health checks
+this.healthChecker.registerCheck('database', async () => {
+  // Check database connection
+  return {
+    name: 'database',
+    status: 'pass', // or 'warn' or 'fail'
+    message: 'Database connection OK'
+  };
+});
+```
+
+## Deployment
+
+### Docker
+
+Create a `Dockerfile`:
+
+```dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY dist/ ./dist/
+COPY .env.local ./
+
+EXPOSE 3000
+CMD ["npm", "start"]
+```
+
+### Environment Variables
+
+For production deployment, set:
+
+```bash
+MCP_TRANSPORT=http
+PORT=3000
+LOG_LEVEL=INFO
+NODE_ENV=production
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**Server won't start:**
+- Check that the port is not already in use
+- Verify environment variables are set correctly
+- Check the logs for specific error messages
+
+**Memory issues:**
+- Monitor memory usage via health checks
+- Consider increasing Node.js memory limit
+
+**Transport issues:**
+- Ensure MCP_TRANSPORT environment variable is set correctly
+- For HTTP transport, verify the port is accessible
+
+## License
+
+MIT
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+---
+
+Generated with [create-mcp](https://github.com/your-username/create-mcp)
