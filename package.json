@@ -1,9 +1,10 @@
 {
-  "name": "create-mcp",
+  "name": "mcp-server-generator",
   "version": "1.0.0",
-  "description": "CLI tool for generating Model Context Protocol (MCP) server projects",
+  "description": "Advanced CLI generator for production-ready Model Context Protocol (MCP) servers with comprehensive Data Analysis Assistant, 8 tools, 9 resources, and 3 intelligent prompts",
   "type": "module",
   "bin": {
+    "mcp-server-generator": "./bin/index.js",
     "create-mcp": "./bin/index.js"
   },
   "main": "./lib/cli/index.js",
@@ -55,7 +56,15 @@
     "generator",
     "typescript",
     "ai",
-    "llm"
+    "llm",
+    "data-analysis",
+    "production-ready",
+    "advanced",
+    "elicitation",
+    "sampling",
+    "tools",
+    "resources",
+    "prompts"
   ],
   "author": "LinuxDevil",
   "license": "MIT",
