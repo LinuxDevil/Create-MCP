@@ -1,6 +1,6 @@
 {
   "name": "mcp-server-generator",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Advanced CLI generator for production-ready Model Context Protocol (MCP) servers with comprehensive Data Analysis Assistant, 8 tools, 9 resources, and 3 intelligent prompts",
   "type": "module",
   "bin": {
