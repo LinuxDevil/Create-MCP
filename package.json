@@ -47,7 +47,8 @@
   "files": [
     "lib",
     "templates",
-    "bin"
+    "bin",
+    "LICENSE"
   ],
   "keywords": [
     "mcp",

@@ -24,7 +24,7 @@ A modern CLI tool for generating production-ready Model Context Protocol (MCP) s
 npx mcp-server-generator my-analysis-server
 
 # Alternative command (backwards compatibility)
-npx create-mcp my-analysis-server
+npx mcp-server-generator my-analysis-server
 
 # Or specify custom options
 npx mcp-server-generator my-analysis-server --transport both --skip-install
