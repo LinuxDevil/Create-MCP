@@ -1,6 +1,6 @@
 # MCP Server Generator
 
-A modern CLI tool for generating production-ready Model Context Protocol (MCP) servers with comprehensive **Data Analysis Assistant** capabilities. Built with clean architecture and advanced MCP features, this tool creates servers that demonstrate all MCP capabilities through one cohesive example instead of scattered demos.
+A modern CLI tool for generating production-ready Model Context Protocol (MCP). Built with clean architecture and advanced MCP features, this tool creates servers that demonstrate all MCP capabilities through one cohesive example instead of scattered demos.
 
 [![npm version](https://badge.fury.io/js/mcp-server-generator.svg)](https://www.npmjs.com/package/mcp-server-generator)
 [![Downloads](https://img.shields.io/npm/dm/mcp-server-generator.svg)](https://www.npmjs.com/package/mcp-server-generator)
@@ -8,7 +8,32 @@ A modern CLI tool for generating production-ready Model Context Protocol (MCP) s
 
 > **📦 Available on npm**: [`mcp-server-generator`](https://www.npmjs.com/package/mcp-server-generator) - 442kB of production-ready MCP server templates
 
-## ✨ **Modern Architecture**
+## 🎬 Video Showcase
+
+See the MCP Server Generator in action! Watch how easy it is to create a production-ready MCP server:
+
+[Watch Demo Video](./generate-mcp.mp4)
+
+Watch the complete workflow from project generation to testing with MCP Inspector
+
+## 📋 Table of Contents
+
+- [Video Showcase](#-video-showcase)
+- [Overview](#overview)
+- [Quick Start](#quick-start)
+- [Features](#features)
+- [CLI Options](#cli-options)
+- [Generated Project Structure](#generated-project-structure)
+- [Usage Examples](#usage-examples)
+- [Development Scripts](#development-scripts)
+- [Development](#development)
+- [Architecture](#architecture)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Overview
+
+### ✨ **Modern Architecture**
 
 - 🎯 **Unified Example**: One comprehensive Data Analysis Assistant showcasing ALL MCP features
 - 🏗️ **Clean Architecture**: Modular design with proper separation of concerns
@@ -17,20 +42,21 @@ A modern CLI tool for generating production-ready Model Context Protocol (MCP) s
 - 📚 **Production Ready**: Comprehensive error handling, validation, and documentation
 - 🚀 **Educational**: Learn MCP best practices through real-world implementation
 
-## Usage
+### 🌟 **What Makes This Different**
 
-```bash
-# Create a comprehensive MCP server with Data Analysis Assistant
-npx mcp-server-generator my-analysis-server
+Unlike other MCP generators that create scattered demo examples, this tool provides:
 
-# Alternative command (backwards compatibility)
-npx mcp-server-generator my-analysis-server
+- 🎯 **One Unified Example**: Data Analysis Assistant showcasing ALL MCP features
+- 🏗️ **Clean Architecture**: Maintainable, extensible, production-ready code
+- 📚 **Educational Value**: Learn MCP best practices through real implementation
+- 🧪 **Integrated Testing**: MCP Inspector ready-to-use with pre-configured scripts
+- 🚀 **Developer Experience**: Convenient scripts, help system, instant feedback
 
-# Or specify custom options
-npx mcp-server-generator my-analysis-server --transport both --skip-install
-```
+Perfect for learning MCP development, building production servers, or as a foundation for custom implementations.
 
-## 📦 Quick Installation
+## Quick Start
+
+### Installation
 
 ```bash
 # One-time usage (recommended)
@@ -38,18 +64,41 @@ npx mcp-server-generator my-project
 
 # Global installation
 npm install -g mcp-server-generator
+mcp-server-generator my-project
 ```
 
-## CLI Options
+### Basic Usage
 
-- `<project-name>`: Name of the MCP server project (required)
-- `-t, --transport <type>`: Transport type (`stdio`, `http`, `both`) - default: `both`
-- `-d, --directory <path>`: Directory to create the project in
-- `--skip-install`: Skip installing dependencies
+```bash
+# Create a comprehensive MCP server with Data Analysis Assistant
+npx mcp-server-generator my-analysis-server
 
-## 🚀 **What You Get**
+# Or specify custom options
+npx mcp-server-generator my-analysis-server --transport both --skip-install
+```
 
-Every generated project includes a **comprehensive Data Analysis Assistant** that demonstrates:
+### Immediate Testing
+
+```bash
+# Create and enter project
+npx mcp-server-generator my-analysis-server
+cd my-analysis-server
+
+# 1️⃣ See everything at once
+npm run quick:test         # Shows all 8 tools, 9 resources, 3 prompts
+
+# 2️⃣ Get help with all commands
+npm run help               # Complete command reference
+
+# 3️⃣ Test with MCP Inspector (2 terminals)
+# Terminal 1:
+npm run dev:http:stateless
+
+# Terminal 2:
+npm run inspector:config -- --server my-analysis-server-http
+```
+
+## Features
 
 ### 🔧 **Comprehensive Tools** (8 powerful tools)
 
@@ -86,6 +135,19 @@ Every generated project includes a **comprehensive Data Analysis Assistant** tha
 - 📊 **AI-Enhanced Sampling**: 6 sampling strategies including AI-powered techniques
 - 🏗️ **Modular Architecture**: Clean separation of concerns with dependency injection
 - 🔍 **MCP Inspector Integration**: Visual and CLI testing built-in
+
+### 🚀 **Transport Support**
+
+- **Stdio Transport**: Standard input/output for Claude Desktop and CLI tools
+- **HTTP Transport**: RESTful API with Server-Sent Events for web integration
+- **Streamable HTTP**: Modern protocol 2025-03-26 with session management
+
+## CLI Options
+
+- `<project-name>`: Name of the MCP server project (required)
+- `-t, --transport <type>`: Transport type (`stdio`, `http`, `both`) - default: `both`
+- `-d, --directory <path>`: Directory to create the project in
+- `--skip-install`: Skip installing dependencies
 
 ## Generated Project Structure
 
@@ -125,72 +187,9 @@ my-analysis-server/
 └── README.md                          # Comprehensive documentation
 ```
 
-### 🚀 **Transport Support**
+## Usage Examples
 
-- **Stdio Transport**: Standard input/output for Claude Desktop and CLI tools
-- **HTTP Transport**: RESTful API with Server-Sent Events for web integration
-- **Streamable HTTP**: Modern protocol 2025-03-26 with session management
-
-### 📝 **Development Scripts**
-
-```bash
-# 🚀 Quick Start & Testing
-npm run quick:test         # Show ALL tools, resources & prompts at once
-npm run help               # Show all available commands
-
-# 🔧 Development
-npm run dev:stdio          # Start with stdio transport (for Claude Desktop)
-npm run dev:http           # Start with HTTP transport
-npm run dev:http:stateless # Start HTTP in stateless mode (best for inspector)
-npm run dev:http:oauth     # Start with OAuth enabled
-
-# 🌐 MCP Inspector Integration (2 terminals)
-# Terminal 1: npm run dev:http:stateless
-# Terminal 2: npm run inspector:config -- --server your-project-http
-
-# 📋 Individual Testing  
-npm run test:tools         # List available tools
-npm run test:resources     # List available resources
-npm run test:prompts       # List available prompts
-
-# 🔍 Inspector Options
-npm run inspector          # Launch visual inspector (UI mode)
-npm run inspector:cli      # Command line testing
-npm run inspector:config   # Use configuration-based testing
-
-# 🚀 Production
-npm run build              # Build TypeScript
-npm run start:stdio        # Production stdio
-npm run start:http         # Production HTTP
-npm run start:http:stateless # Production HTTP stateless
-```
-
-## 🎯 **Example Usage**
-
-After creating a project, you get a comprehensive Data Analysis Assistant:
-
-### 🚀 **Quick Start (Recommended)**
-
-```bash
-# Create and enter project
-npx mcp-server-generator my-analysis-server
-cd my-analysis-server
-
-# 1️⃣ See everything at once
-npm run quick:test         # Shows all 8 tools, 9 resources, 3 prompts
-
-# 2️⃣ Get help with all commands
-npm run help               # Complete command reference
-
-# 3️⃣ Test with MCP Inspector (2 terminals)
-# Terminal 1:
-npm run dev:http:stateless
-
-# Terminal 2:
-npm run inspector:config -- --server my-analysis-server-http
-```
-
-### 🔍 **Advanced Testing**
+### 🚀 **Quick Start Testing**
 
 ```bash
 # Test individual components
@@ -233,39 +232,59 @@ npx @modelcontextprotocol/inspector --cli tsx src/server.ts \
   --tool-arg 'format=json'
 ```
 
-## 🎉 **Enhanced Developer Experience**
+## Development Scripts
+
+### 📝 **Available Scripts** (for generated projects)
+
+```bash
+# 🚀 Quick Start & Testing
+npm run quick:test         # Show ALL tools, resources & prompts at once
+npm run help               # Show all available commands
+
+# 🔧 Development
+npm run dev:stdio          # Start with stdio transport (for Claude Desktop)
+npm run dev:http           # Start with HTTP transport
+npm run dev:http:stateless # Start HTTP in stateless mode (best for inspector)
+npm run dev:http:oauth     # Start with OAuth enabled
+
+# 🌐 MCP Inspector Integration (2 terminals)
+# Terminal 1: npm run dev:http:stateless
+# Terminal 2: npm run inspector:config -- --server your-project-http
+
+# 📋 Individual Testing  
+npm run test:tools         # List available tools
+npm run test:resources     # List available resources
+npm run test:prompts       # List available prompts
+
+# 🔍 Inspector Options
+npm run inspector          # Launch visual inspector (UI mode)
+npm run inspector:cli      # Command line testing
+npm run inspector:config   # Use configuration-based testing
+
+# 🚀 Production
+npm run build              # Build TypeScript
+npm run start:stdio        # Production stdio
+npm run start:http         # Production HTTP
+npm run start:http:stateless # Production HTTP stateless
+```
+
+### 🎉 **Enhanced Developer Experience**
 
 This generator has been thoroughly tested and improved with:
 
-### ✅ **Production-Ready Quality**
+#### ✅ **Production-Ready Quality**
+
 - **Zero TypeScript Errors**: All 26+ compilation issues resolved
 - **Working Scripts**: Every npm script tested and functional
 - **Clean Architecture**: Proper separation of concerns with dependency injection
 - **Error Handling**: Comprehensive validation and graceful error recovery
 
-### 🚀 **Instant Productivity**
+#### 🚀 **Instant Productivity**
+
 - **One-Command Testing**: `npm run quick:test` shows everything at once
 - **Built-in Help**: `npm run help` provides complete command reference
 - **Smart Defaults**: Optimized configurations for immediate use
 - **Inspector Integration**: Seamless MCP Inspector setup with clear instructions
-
-### 🔧 **Advanced Features**
-- **8 Comprehensive Tools**: Including interactive elicitation and AI sampling
-- **9 Rich Resources**: Complete documentation and methodology guides
-- **3 Flexible Prompts**: Multi-methodology research analysis
-- **Multiple Transports**: Stdio, HTTP, and Streamable HTTP support
-
-### 🌟 **What Makes This Different**
-
-Unlike other MCP generators that create scattered demo examples, this tool provides:
-
-- 🎯 **One Unified Example**: Data Analysis Assistant showcasing ALL MCP features
-- 🏗️ **Clean Architecture**: Maintainable, extensible, production-ready code
-- 📚 **Educational Value**: Learn MCP best practices through real implementation
-- 🧪 **Integrated Testing**: MCP Inspector ready-to-use with pre-configured scripts
-- 🚀 **Developer Experience**: Convenient scripts, help system, instant feedback
-
-Perfect for learning MCP development, building production servers, or as a foundation for custom implementations.
 
 ## Development
 
@@ -386,19 +405,6 @@ Our template system generates **production-ready MCP servers** with:
 - **Security**: OAuth, CORS, DNS protection
 - **Monitoring**: Health checks, status reporting, comprehensive logging
 
-## ✨ **Why This Approach?**
-
-Traditional MCP generators create confusing scattered examples (calculator, echo, etc.). Our approach provides:
-
-- 🎯 **One comprehensive example** instead of confusing scattered demos
-- 🏗️ **Clean separation of concerns** for maintainable code
-- 📚 **Educational value** showing how all MCP features work together
-- 🔧 **Real-world applicability** with practical data analysis use case
-- 🧪 **Built-in testing** with MCP Inspector integration
-- 📈 **Scalable foundation** for building complex MCP servers
-
-Perfect for learning MCP development, building production servers, or as a foundation for custom implementations.
-
 ## Contributing
 
 1. Fork the repository
@@ -435,20 +441,8 @@ This project is inspired by and builds upon:
 
 **MCP Server Generator** - Generate production-ready Model Context Protocol servers with comprehensive Data Analysis Assistant and integrated testing.
 
-## 📦 Installation & Usage
+**Package Information:**
 
-### Global Installation
-```bash
-npm install -g mcp-server-generator
-mcp-server-generator my-project
-```
-
-### One-time Usage (Recommended)
-```bash
-npx mcp-server-generator my-project
-```
-
-### Package Information
 - **npm Package**: [mcp-server-generator](https://www.npmjs.com/package/mcp-server-generator)
 - **GitHub**: [LinuxDevil/Create-MCP](https://github.com/LinuxDevil/Create-MCP)
 - **Size**: 442 kB (155 files)
