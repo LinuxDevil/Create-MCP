@@ -106,7 +106,6 @@ export async function runPrompts(
     transportTypes: initialOptions.transportTypes || answers.transportTypes,
     includeExamples: initialOptions.includeExamples !== undefined ? initialOptions.includeExamples : answers.includeExamples,
     packageManager: initialOptions.packageManager || answers.packageManager,
-    // Modern features
     enableOAuth: initialOptions.enableOAuth !== undefined ? initialOptions.enableOAuth : answers.enableOAuth || false,
     enableDnsProtection: initialOptions.enableDnsProtection !== undefined ? initialOptions.enableDnsProtection : answers.enableDnsProtection !== undefined ? answers.enableDnsProtection : true,
     enableStateless: initialOptions.enableStateless !== undefined ? initialOptions.enableStateless : answers.enableStateless || false,
@@ -115,7 +114,6 @@ export async function runPrompts(
     includeElicitation: initialOptions.includeElicitation !== undefined ? initialOptions.includeElicitation : answers.includeElicitation !== undefined ? answers.includeElicitation : true,
   };
 
-  // Display configuration summary
   console.log(chalk.green('\n📋 Configuration Summary:'));
   console.log(chalk.gray(`  Name: ${config.name}`));
   console.log(chalk.gray(`  Description: ${config.description}`));
@@ -124,7 +122,6 @@ export async function runPrompts(
   console.log(chalk.gray(`  Examples: ${config.includeExamples ? 'Yes' : 'No'}`));
   console.log(chalk.gray(`  Package Manager: ${config.packageManager}`));
   
-  // Modern features summary
   if (config.transportTypes === 'http' || config.transportTypes === 'both') {
     console.log(chalk.blue('\n🚀 Modern Features:'));
     console.log(chalk.gray(`  OAuth Authentication: ${config.enableOAuth ? 'Yes' : 'No'}`));

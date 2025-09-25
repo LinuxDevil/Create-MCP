@@ -25,7 +25,6 @@ export async function copyDirectory(srcDir: string, destDir: string): Promise<vo
 }
 
 export function getTemplatesDirectory(): string {
-  // Go up from src/utils/ to project root, then to templates/
   return path.join(__dirname, '..', '..', 'templates');
 }
 

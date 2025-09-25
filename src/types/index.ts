@@ -7,7 +7,6 @@ export interface CreateMcpOptions {
   packageManager?: 'npm' | 'yarn' | 'pnpm' | 'bun';
   skipInstall?: boolean;
   verbose?: boolean;
-  // Modern MCP features
   enableOAuth?: boolean;
   enableDnsProtection?: boolean;
   enableStateless?: boolean;
@@ -43,5 +42,5 @@ export interface TemplateVariables {
   INCLUDE_EXAMPLES?: string;
   TRANSPORT_TYPES?: string;
   PACKAGE_MANAGER?: string;
-  [key: string]: string | undefined; // Allow additional variables
+  [key: string]: string | undefined;
 }

@@ -8,12 +8,10 @@ export interface ValidationResult {
 }
 
 export function validateProjectName(name: string): ValidationResult {
-  // Check for empty name
   if (!name || name.trim().length === 0) {
     return { isValid: false, error: 'Project name cannot be empty' };
   }
 
-  // Check for valid characters
   if (!/^[a-zA-Z0-9-_]+$/.test(name)) {
     return { 
       isValid: false, 
@@ -21,7 +19,6 @@ export function validateProjectName(name: string): ValidationResult {
     };
   }
 
-  // Check for reserved names
   const reservedNames = [
     'node_modules',
     'package.json',
@@ -39,7 +36,6 @@ export function validateProjectName(name: string): ValidationResult {
     };
   }
 
-  // Check for npm package name validity
   if (name.length > 214) {
     return { 
       isValid: false, 
@@ -54,7 +50,6 @@ export function validateProjectName(name: string): ValidationResult {
     };
   }
 
-  // Check if directory already exists
   const projectPath = path.join(process.cwd(), name);
   if (fs.pathExistsSync(projectPath)) {
     return { 

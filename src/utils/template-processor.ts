@@ -10,11 +10,9 @@ export async function processTemplate(
     const templateContent = await fs.readFile(templatePath, 'utf-8');
     const processedContent = processTemplateContent(templateContent, variables);
     
-    // Remove .template extension
     const outputPath = templatePath.replace(/\.template$/, '');
     await fs.writeFile(outputPath, processedContent);
     
-    // Remove the template file
     await fs.remove(templatePath);
   } catch (error) {
     throw new Error(`Failed to process template ${templatePath}: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -68,7 +66,6 @@ export function createTemplateVariables(
   author: string = '',
   additionalVars: Record<string, string> = {}
 ): TemplateVariables {
-  // Convert projectName to different cases
   const pascalCase = projectName
     .split(/[-_]/)
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -90,7 +87,7 @@ export function createTemplateVariables(
     PROJECT_AUTHOR: author,
     CURRENT_YEAR: new Date().getFullYear().toString(),
     CURRENT_DATE: new Date().toISOString().split('T')[0],
-    MCP_SDK_VERSION: '^1.0.0', // Latest version from the SDK
+    MCP_SDK_VERSION: '^1.0.0',
     NODE_VERSION: process.version,
     ...additionalVars
   };

@@ -8,7 +8,6 @@ import semver from 'semver';
 export type PackageManager = 'npm' | 'yarn' | 'pnpm' | 'bun';
 
 export async function detectPackageManager(): Promise<PackageManager> {
-  // Check for lock files
   const cwd = process.cwd();
   
   if (await fs.pathExists(path.join(cwd, 'pnpm-lock.yaml'))) {
@@ -22,7 +21,6 @@ export async function detectPackageManager(): Promise<PackageManager> {
   return 'npm';
 }
 
-// Windows compatibility - npm is a .cmd file on Windows
 function getPackageManagerCommand(packageManager: string): string {
   if (process.platform === 'win32') {
     return `${packageManager}.cmd`;
@@ -59,7 +57,6 @@ export async function checkForUpdates(): Promise<void> {
     const packageJson = await fs.readJson(path.join(__dirname, '../../package.json'));
     const currentVersion = packageJson.version;
     
-    // Check npm registry for latest version
     const latestVersion = await getLatestVersion('create-mcp');
     
     if (latestVersion && latestVersion !== currentVersion) {

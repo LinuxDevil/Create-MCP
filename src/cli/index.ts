@@ -44,44 +44,35 @@ program
   .option('--no-elicitation', 'exclude user input elicitation examples')
   .action(async (projectName: string, options: Partial<CreateMcpOptions>) => {
     try {
-      // Print welcome message
       await printWelcome();
 
-      // Set verbose logging if requested
       if (options.verbose) {
         process.env.VERBOSE = 'true';
       }
 
       console.log(chalk.blue.bold('🚀 Creating MCP Server Project\n'));
 
-      // Check for CLI updates (non-blocking)
       await checkForUpdates();
 
-      // Validate project name
       const validationResult = validateProjectName(projectName);
       if (!validationResult.isValid) {
         console.error(chalk.red(`❌ Error: ${validationResult.error}`));
         process.exit(1);
       }
 
-      // Detect package manager if not specified
       if (!options.packageManager) {
         options.packageManager = await detectPackageManager();
         console.log(chalk.gray(`📦 Detected package manager: ${options.packageManager}`));
       }
 
-      // Run interactive prompts for missing options
       const projectConfig = await runPrompts(projectName, options);
 
-      // Generate the project
       console.log(chalk.blue('🏗️  Generating project...\n'));
       await generateProject(projectConfig);
 
-      // Success message
       console.log(chalk.green.bold('\n✅ Project created successfully!'));
       console.log(chalk.cyan(`\n📁 Project created at: ./${projectName}`));
       
-      // Next steps
       console.log(chalk.yellow('\n🚀 Next steps:'));
       console.log(chalk.gray(`  cd ${projectName}`));
       
@@ -92,7 +83,6 @@ program
       console.log(chalk.gray(`  ${projectConfig.packageManager} run dev`));
       console.log('');
       
-      // Transport-specific instructions
       if (projectConfig.transportTypes === 'both' || projectConfig.transportTypes === 'stdio') {
         console.log(chalk.blue('📡 Stdio Transport:'));
         console.log(chalk.gray(`  ${projectConfig.packageManager} run dev:stdio`));
@@ -125,7 +115,6 @@ program
     }
   });
 
-// Add help examples
 program.addHelpText('after', `
 Examples:
   $ npx create-mcp my-mcp-server
@@ -141,14 +130,12 @@ Transport Types:
 For more information, visit: https://modelcontextprotocol.io
 `);
 
-// Handle unknown commands
 program.on('command:*', function (operands) {
   console.error(chalk.red(`❌ Unknown command: ${operands[0]}`));
   console.log(chalk.gray('Run "create-mcp --help" for available commands.'));
   process.exit(1);
 });
 
-// Enhanced error handling
 process.on('uncaughtException', (error) => {
   console.error(chalk.red('❌ Uncaught exception:'), error.message);
   if (process.env.VERBOSE) {
@@ -162,7 +149,6 @@ process.on('unhandledRejection', (reason) => {
   process.exit(1);
 });
 
-// Parse command line arguments
 program.parseAsync().catch((error) => {
   console.error(chalk.red('❌ CLI Error:'), error.message);
   process.exit(1);

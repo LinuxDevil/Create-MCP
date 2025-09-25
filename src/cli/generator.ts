@@ -23,10 +23,8 @@ export async function generateProject(config: CreateMcpOptions): Promise<void> {
   const projectPath = path.join(process.cwd(), config.name);
   
   try {
-    // Validate templates directory exists
     await validateTemplatesDirectory();
     
-    // Check if directory already exists
     if (await fs.pathExists(projectPath)) {
       throw new Error(`Directory ${config.name} already exists`);
     }
@@ -34,39 +32,32 @@ export async function generateProject(config: CreateMcpOptions): Promise<void> {
     console.log(chalk.blue('📁 Creating project directory...'));
     await ensureDirectoryExists(projectPath);
 
-    // Copy template files
     console.log(chalk.blue('📋 Copying template files...'));
     await copyTemplateFiles(config, projectPath);
 
-    // Process template variables
     console.log(chalk.blue('🔧 Processing templates...'));
     await processTemplateVariables(config, projectPath);
 
-    // Remove unused transport code if needed
     if (config.transportTypes !== 'both') {
       console.log(chalk.blue('✂️  Removing unused transport code...'));
       await removeUnusedTransportCode(config, projectPath);
     }
 
-    // Remove examples if not wanted
     if (!config.includeExamples) {
       console.log(chalk.blue('🗑️  Removing example implementations...'));
       await removeExampleCode(projectPath);
     }
 
-    // Install dependencies
     if (!config.skipInstall) {
       console.log(chalk.blue('📦 Installing dependencies...'));
       await installDependencies(projectPath, config.packageManager!);
     }
 
-    // Show project statistics
     await showProjectStatistics(projectPath);
 
     console.log(chalk.green('🎉 Project setup complete!'));
 
   } catch (error) {
-    // Clean up on failure
     if (await fs.pathExists(projectPath)) {
       await fs.remove(projectPath);
     }
@@ -79,11 +70,9 @@ async function copyTemplateFiles(config: CreateMcpOptions, projectPath: string):
   const spinner = ora('Copying template files...').start();
   
   try {
-    // Copy base files (package.json, tsconfig.json, etc.)
     const baseDir = path.join(templatesDir, 'base');
     await copyDirectory(baseDir, projectPath);
     
-    // Copy source files
     const srcDir = path.join(templatesDir, 'src');
     const projectSrcDir = path.join(projectPath, 'src');
     await copyDirectory(srcDir, projectSrcDir);
@@ -104,7 +93,6 @@ async function processTemplateVariables(config: CreateMcpOptions, projectPath: s
       config.description || '',
       config.author || '',
       {
-        // Modern feature flags
         ENABLE_OAUTH: config.enableOAuth ? 'true' : 'false',
         ENABLE_DNS_PROTECTION: config.enableDnsProtection !== false ? 'true' : 'false',
         ENABLE_STATELESS: config.enableStateless ? 'true' : 'false',
@@ -137,10 +125,8 @@ async function removeUnusedTransportCode(config: CreateMcpOptions, projectPath: 
     let serverContent = await fs.readFile(serverPath, 'utf-8');
 
     if (config.transportTypes === 'stdio') {
-      // Remove HTTP-specific imports and code
       serverContent = removeHttpTransportCode(serverContent);
     } else if (config.transportTypes === 'http') {
-      // Remove Stdio-specific imports and code
       serverContent = removeStdioTransportCode(serverContent);
     }
 
@@ -151,47 +137,34 @@ async function removeUnusedTransportCode(config: CreateMcpOptions, projectPath: 
 }
 
 function removeHttpTransportCode(content: string): string {
-  // Remove HTTP-specific imports
   content = content.replace(/import.*StreamableHTTPServerTransport.*\n/g, '');
   content = content.replace(/import.*express.*\n/g, '');
   content = content.replace(/import.*cors.*\n/g, '');
   content = content.replace(/import.*randomUUID.*\n/g, '');
   
-  // Remove HTTP transport method and related code
   content = content.replace(/\/\*\*[\s\S]*?Start the server with.*HTTP transport[\s\S]*?\*\/[\s\S]*?async startHttp\([\s\S]*?\n  \}/g, '');
   
-  // Remove HTTP-related switch case
   content = content.replace(/case 'http':[\s\S]*?break;/g, '');
   
-  // Update main function to only use stdio
   content = content.replace(
     /const transportMode = process\.env\.MCP_TRANSPORT \|\| process\.argv\[2\] \|\| 'stdio';/,
     "const transportMode = 'stdio';"
   );
   
-  // Clean up any remaining HTTP references
   content = content.replace(/Available modes: stdio, http/g, 'Available modes: stdio');
   
   return content;
 }
 
 function removeStdioTransportCode(content: string): string {
-  // Remove Stdio-specific imports
   content = content.replace(/import.*StdioServerTransport.*\n/g, '');
-  
-  // Remove Stdio transport method
   content = content.replace(/\/\*\*[\s\S]*?Start the server with Stdio transport[\s\S]*?\*\/[\s\S]*?async startStdio\([\s\S]*?\n  \}/g, '');
-  
-  // Remove Stdio-related switch case
   content = content.replace(/case 'stdio':[\s\S]*?break;/g, '');
-  
-  // Update main function to only use http
   content = content.replace(
     /const transportMode = process\.env\.MCP_TRANSPORT \|\| process\.argv\[2\] \|\| 'stdio';/,
     "const transportMode = 'http';"
   );
   
-  // Clean up any remaining Stdio references
   content = content.replace(/Available modes: stdio, http/g, 'Available modes: http');
   
   return content;
@@ -207,11 +180,9 @@ async function removeExampleCode(projectPath: string): Promise<void> {
   try {
     let serverContent = await fs.readFile(serverPath, 'utf-8');
     
-    // Remove example service import and usage
     serverContent = serverContent.replace(/import.*ExampleService.*\n/g, '');
     serverContent = serverContent.replace(/private exampleService: ExampleService;[\s\S]*?this\.exampleService = new ExampleService\(\);/g, '');
     
-    // Remove example registrations
     serverContent = serverContent.replace(/private registerTools\(\): void \{[\s\S]*?\n  \}/g, 
       'private registerTools(): void {\n    // Add your custom tools here\n  }');
     
@@ -223,7 +194,6 @@ async function removeExampleCode(projectPath: string): Promise<void> {
 
     await fs.writeFile(serverPath, serverContent);
 
-    // Remove example service file
     const exampleServicePath = path.join(projectPath, 'src', 'services', 'example.ts');
     if (await fs.pathExists(exampleServicePath)) {
       await fs.remove(exampleServicePath);
@@ -247,7 +217,6 @@ async function showProjectStatistics(projectPath: string): Promise<void> {
     console.log(chalk.gray(`  Total size: ${formatFileSize(stats.totalSize)}`));
     console.log(chalk.gray(`  Lines of code: ${stats.linesOfCode}`));
   } catch (error) {
-    // Don't fail if we can't get statistics
     if (process.env.VERBOSE) {
       console.log(chalk.yellow('Could not calculate project statistics'));
     }
@@ -273,13 +242,11 @@ async function getProjectStatistics(projectPath: string): Promise<{
       } else if (item.isFile()) {
         fileCount++;
         
-        // Count lines of code for source files
         if (item.name.endsWith('.ts') || item.name.endsWith('.js') || item.name.endsWith('.json')) {
           try {
             const content = await fs.readFile(itemPath, 'utf-8');
             linesOfCode += content.split('\n').length;
           } catch (error) {
-            // Ignore errors reading individual files
           }
         }
       }

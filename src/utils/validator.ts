@@ -9,7 +9,6 @@ export interface ValidationResult {
 }
 
 export function validateProjectName(name: string): ValidationResult {
-  // Check if name is empty
   if (!name || name.trim().length === 0) {
     return {
       isValid: false,
@@ -17,7 +16,6 @@ export function validateProjectName(name: string): ValidationResult {
     };
   }
 
-  // Check npm package name validity
   const npmValidation = validateNpmName(name);
   if (!npmValidation.validForNewPackages) {
     const errors = [
@@ -31,7 +29,6 @@ export function validateProjectName(name: string): ValidationResult {
     };
   }
 
-  // Check for reserved names
   const reservedNames = [
     'mcp',
     'modelcontextprotocol',
@@ -50,7 +47,6 @@ export function validateProjectName(name: string): ValidationResult {
     };
   }
 
-  // Check if directory already exists
   const projectPath = path.resolve(process.cwd(), name);
   if (fs.existsSync(projectPath)) {
     const files = fs.readdirSync(projectPath);
@@ -62,7 +58,6 @@ export function validateProjectName(name: string): ValidationResult {
     }
   }
 
-  // Additional checks for common issues
   const warnings: string[] = [];
   
   if (name.length > 50) {
