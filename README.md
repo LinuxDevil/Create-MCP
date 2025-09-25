@@ -6,7 +6,8 @@ A modern CLI tool for generating and extending production-ready Model Context Pr
 [![Downloads](https://img.shields.io/npm/dm/mcp-server-generator.svg)](https://www.npmjs.com/package/mcp-server-generator)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **📦 Available on npm**: [`mcp-server-generator`](https://www.npmjs.com/package/mcp-server-generator) - 442kB of production-ready MCP server templates
+> **📦 Available on npm**: [`mcp-server-generator`](https://www.npmjs.com/package/mcp-server-generator) - 442kB of production-ready MCP server templates  
+> **📚 Complete Documentation**: [mcp-server-generator.com](https://mcp-server-generator.com)
 
 ## 🎬 Video Showcase
 
@@ -15,6 +16,8 @@ See the MCP Server Generator in action! Watch how easy it is to create a product
 [Watch Demo Video](./generate-mcp.mp4)
 
 Watch the complete workflow from project generation to testing with MCP Inspector
+
+> **📖 Detailed guides and tutorials**: [mcp-server-generator.com](https://mcp-server-generator.com)
 
 ## 📋 Table of Contents
 
@@ -31,6 +34,8 @@ Watch the complete workflow from project generation to testing with MCP Inspecto
 - [Architecture](#architecture)
 - [Contributing](#contributing)
 - [License](#license)
+
+> **📚 For comprehensive documentation, examples, and guides, visit [mcp-server-generator.com](https://mcp-server-generator.com)**
 
 ## Overview
 
@@ -56,6 +61,10 @@ Unlike other MCP generators that create scattered demo examples, this tool provi
 - ➕ **Component Extension**: Add tools, resources, prompts, services, transports, and utils to existing projects
 
 Perfect for learning MCP development, building production servers, or as a foundation for custom implementations. **Start with our comprehensive example, then extend with your own components!**
+
+**📚 Complete Documentation**: [mcp-server-generator.com](https://mcp-server-generator.com)  
+**🚀 Quick Start Guide**: [Installation & Setup](https://mcp-server-generator.com/docs/installation)  
+**💡 Examples & Tutorials**: [Component Examples](https://mcp-server-generator.com/docs/examples)
 
 ## Quick Start
 
@@ -604,6 +613,12 @@ Our template system generates **production-ready MCP servers** with:
 - Update documentation for API changes
 - Use conventional commit messages
 
+### Documentation
+
+- **Main Documentation**: [mcp-server-generator.com](https://mcp-server-generator.com)
+- **API Reference**: [mcp-server-generator.com/docs/api/overview](https://mcp-server-generator.com/docs/api/overview)
+- **Contributing Guide**: [GitHub Contributing Guidelines](https://github.com/LinuxDevil/Create-MCP/blob/main/CONTRIBUTING.md)
+
 ## License
 
 MIT License - see LICENSE file for details.
@@ -634,3 +649,9 @@ This project is inspired by and builds upon:
 - 📋 **Component Listing**: `mcp-server-generator list`
 - 🔧 **6 Component Types**: tools, resources, prompts, services, transports, utils
 - 🎯 **Smart Integration**: Automatic registry updates and type-safe generation
+
+**📚 Learn More:**
+- **Complete Documentation**: [mcp-server-generator.com](https://mcp-server-generator.com)
+- **API Reference**: [mcp-server-generator.com/docs/api/overview](https://mcp-server-generator.com/docs/api/overview)
+- **Component Guide**: [mcp-server-generator.com/docs/components/overview](https://mcp-server-generator.com/docs/components/overview)
+- **CLI Reference**: [mcp-server-generator.com/docs/cli-commands](https://mcp-server-generator.com/docs/cli-commands)
