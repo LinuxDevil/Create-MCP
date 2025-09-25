@@ -13,7 +13,11 @@
     "dev": "npx tsx src/cli/index.ts",
     "test": "jest",
     "lint": "eslint src/**/*.ts",
-    "prepublishOnly": "npm run build"
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "test:cli": "node bin/index.js --help",
+    "test:create": "mkdir -p test-temp && cd test-temp && node ../bin/index.js test-project --skip-install && cd .. && rm -rf test-temp",
+    "pre-publish": "npm run build && npm run test:cli",
+    "prepublishOnly": "npm run pre-publish"
   },
   "dependencies": {
     "chalk": "^5.3.0",
