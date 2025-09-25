@@ -240,13 +240,13 @@ export async function applyRegistryUpdates(
     try {
       switch (update.registryType) {
         case 'tool':
-          await updateToolRegistry(projectContext, update);
+          await updateToolRegistryWithAutoDiscovery(projectContext, update);
           break;
         case 'resource':
-          await updateResourceRegistry(projectContext, update);
+          await updateResourceRegistryWithAutoDiscovery(projectContext, update);
           break;
         case 'prompt':
-          await updatePromptRegistry(projectContext, update);
+          await updatePromptRegistryWithAutoDiscovery(projectContext, update);
           break;
         default:
           console.warn(`Unknown registry type: ${update.registryType}`);
@@ -256,6 +256,189 @@ export async function applyRegistryUpdates(
       throw error;
     }
   }
+}
+
+/**
+ * Update tool registry with auto-discovery pattern
+ */
+async function updateToolRegistryWithAutoDiscovery(
+  projectContext: ProjectContext,
+  registryUpdate: RegistryUpdate
+): Promise<void> {
+  const registryPath = path.join(projectContext.srcPath, 'tools', 'index.ts');
+
+  if (!await fs.pathExists(registryPath)) {
+    throw new Error(`Tool registry not found: ${registryPath}`);
+  }
+
+  let content = await fs.readFile(registryPath, 'utf-8');
+
+  if (!content.includes(registryUpdate.addImport.split(' ')[1])) {
+    const importRegex = /import.*from.*['""];/g;
+    const imports = content.match(importRegex);
+    
+    if (imports && imports.length > 0) {
+      const lastImport = imports[imports.length - 1];
+      const lastImportIndex = content.lastIndexOf(lastImport);
+      const insertPosition = lastImportIndex + lastImport.length;
+      
+      content = content.slice(0, insertPosition) + '\n' + registryUpdate.addImport + content.slice(insertPosition);
+    }
+  }
+
+  const initMethodRegex = /private\s+initializeTools\(\):\s*void\s*{([^}]*?)}/s;
+  const initMatch = content.match(initMethodRegex);
+
+  if (initMatch) {
+    const initMethodContent = initMatch[1];
+    
+    if (!initMethodContent.includes(registryUpdate.addRegistration)) {
+      const lastRegistration = initMethodContent.lastIndexOf('this.tools.set(');
+      
+      if (lastRegistration !== -1) {
+        const lineEnd = initMethodContent.indexOf(';', lastRegistration) + 1;
+        const insertPosition = lineEnd;
+        
+        const newInitMethodContent = 
+          initMethodContent.slice(0, insertPosition) + 
+          '\n    ' + registryUpdate.addRegistration +
+          initMethodContent.slice(insertPosition);
+        
+        content = content.replace(initMethodRegex, `private initializeTools(): void {${newInitMethodContent}}`);
+      } else {
+        const newInitMethodContent = 
+          initMethodContent.trimEnd() + 
+          '\n    ' + registryUpdate.addRegistration + '\n    ';
+        
+        content = content.replace(initMethodRegex, `private initializeTools(): void {${newInitMethodContent}}`);
+      }
+    }
+  }
+
+  await fs.writeFile(registryPath, content, 'utf-8');
+  console.log(`Updated tool registry: ${registryPath}`);
+}
+
+/**
+ * Update resource registry with auto-discovery pattern
+ */
+async function updateResourceRegistryWithAutoDiscovery(
+  projectContext: ProjectContext,
+  registryUpdate: RegistryUpdate
+): Promise<void> {
+  const registryPath = path.join(projectContext.srcPath, 'resources', 'index.ts');
+
+  if (!await fs.pathExists(registryPath)) {
+    throw new Error(`Resource registry not found: ${registryPath}`);
+  }
+
+  let content = await fs.readFile(registryPath, 'utf-8');
+
+  if (!content.includes(registryUpdate.addImport.split(' ')[1])) {
+    const importRegex = /import.*from.*['""];/g;
+    const imports = content.match(importRegex);
+    
+    if (imports && imports.length > 0) {
+      const lastImport = imports[imports.length - 1];
+      const lastImportIndex = content.lastIndexOf(lastImport);
+      const insertPosition = lastImportIndex + lastImport.length;
+      
+      content = content.slice(0, insertPosition) + '\n' + registryUpdate.addImport + content.slice(insertPosition);
+    }
+  }
+
+  const initMethodRegex = /private\s+initializeResources\(\):\s*void\s*{([^}]*?)}/s;
+  const initMatch = content.match(initMethodRegex);
+
+  if (initMatch) {
+    const initMethodContent = initMatch[1];
+    
+    if (!initMethodContent.includes(registryUpdate.addRegistration)) {
+      const lastRegistration = initMethodContent.lastIndexOf('this.resources.set(');
+      
+      if (lastRegistration !== -1) {
+        const lineEnd = initMethodContent.indexOf(';', lastRegistration) + 1;
+        const insertPosition = lineEnd;
+        
+        const newInitMethodContent = 
+          initMethodContent.slice(0, insertPosition) + 
+          '\n    ' + registryUpdate.addRegistration +
+          initMethodContent.slice(insertPosition);
+        
+        content = content.replace(initMethodRegex, `private initializeResources(): void {${newInitMethodContent}}`);
+      } else {
+        const newInitMethodContent = 
+          initMethodContent.trimEnd() + 
+          '\n    ' + registryUpdate.addRegistration + '\n    ';
+        
+        content = content.replace(initMethodRegex, `private initializeResources(): void {${newInitMethodContent}}`);
+      }
+    }
+  }
+
+  await fs.writeFile(registryPath, content, 'utf-8');
+  console.log(`Updated resource registry: ${registryPath}`);
+}
+
+/**
+ * Update prompt registry with auto-discovery pattern
+ */
+async function updatePromptRegistryWithAutoDiscovery(
+  projectContext: ProjectContext,
+  registryUpdate: RegistryUpdate
+): Promise<void> {
+  const registryPath = path.join(projectContext.srcPath, 'prompts', 'index.ts');
+
+  if (!await fs.pathExists(registryPath)) {
+    throw new Error(`Prompt registry not found: ${registryPath}`);
+  }
+
+  let content = await fs.readFile(registryPath, 'utf-8');
+
+  if (!content.includes(registryUpdate.addImport.split(' ')[1])) {
+    const importRegex = /import.*from.*['""];/g;
+    const imports = content.match(importRegex);
+    
+    if (imports && imports.length > 0) {
+      const lastImport = imports[imports.length - 1];
+      const lastImportIndex = content.lastIndexOf(lastImport);
+      const insertPosition = lastImportIndex + lastImport.length;
+      
+      content = content.slice(0, insertPosition) + '\n' + registryUpdate.addImport + content.slice(insertPosition);
+    }
+  }
+
+  const initMethodRegex = /private\s+initializePrompts\(\):\s*void\s*{([^}]*?)}/s;
+  const initMatch = content.match(initMethodRegex);
+
+  if (initMatch) {
+    const initMethodContent = initMatch[1];
+    
+    if (!initMethodContent.includes(registryUpdate.addRegistration)) {
+      const lastRegistration = initMethodContent.lastIndexOf('this.prompts.set(');
+      
+      if (lastRegistration !== -1) {
+        const lineEnd = initMethodContent.indexOf(';', lastRegistration) + 1;
+        const insertPosition = lineEnd;
+        
+        const newInitMethodContent = 
+          initMethodContent.slice(0, insertPosition) + 
+          '\n    ' + registryUpdate.addRegistration +
+          initMethodContent.slice(insertPosition);
+        
+        content = content.replace(initMethodRegex, `private initializePrompts(): void {${newInitMethodContent}}`);
+      } else {
+        const newInitMethodContent = 
+          initMethodContent.trimEnd() + 
+          '\n    ' + registryUpdate.addRegistration + '\n    ';
+        
+        content = content.replace(initMethodRegex, `private initializePrompts(): void {${newInitMethodContent}}`);
+      }
+    }
+  }
+
+  await fs.writeFile(registryPath, content, 'utf-8');
+  console.log(`Updated prompt registry: ${registryPath}`);
 }
 
 /**

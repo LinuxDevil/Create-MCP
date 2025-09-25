@@ -149,8 +149,8 @@ export class ${className} implements BaseTool {
     {
       registryType: 'tool',
       addImport: `import { ${className} } from "./${registryKey}-tool.js";`,
-      addInitialization: `    this.tools.set('${registryKey}', new ${className}());`,
-      addRegistration: `    // ${className} - ${description}`
+      addRegistration: `this.tools.set('${registryKey}', new ${className}());`,
+      addInitialization: `// ${className} - ${description}`
     }
   ];
 
@@ -292,8 +292,8 @@ Timestamp: \${new Date().toISOString()}
     {
       registryType: 'resource',
       addImport: `import { ${className} } from "./${registryKey}-resource.js";`,
-      addInitialization: `    this.resources.set('${registryKey}', new ${className}());`,
-      addRegistration: `    // ${className} - ${description}`
+      addRegistration: `this.resources.set('${registryKey}', new ${className}());`,
+      addInitialization: `// ${className} - ${description}`
     }
   ];
 
@@ -427,8 +427,8 @@ export class ${className} implements BasePrompt {
     {
       registryType: 'prompt',
       addImport: `import { ${className} } from "./${registryKey}-prompt.js";`,
-      addInitialization: `    this.prompts.set('${registryKey}', new ${className}());`,
-      addRegistration: `    // ${className} - ${description}`
+      addRegistration: `this.prompts.set('${registryKey}', new ${className}());`,
+      addInitialization: `// ${className} - ${description}`
     }
   ];
 
