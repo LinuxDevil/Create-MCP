@@ -1,6 +1,12 @@
-# Create MCP CLI
+# MCP Server Generator
 
-A modern CLI tool for generating production-ready Model Context Protocol (MCP) servers. Built with clean architecture and advanced MCP features, this tool creates servers that demonstrate all MCP capabilities through one cohesive example.
+A modern CLI tool for generating production-ready Model Context Protocol (MCP) servers with comprehensive **Data Analysis Assistant** capabilities. Built with clean architecture and advanced MCP features, this tool creates servers that demonstrate all MCP capabilities through one cohesive example instead of scattered demos.
+
+[![npm version](https://badge.fury.io/js/mcp-server-generator.svg)](https://www.npmjs.com/package/mcp-server-generator)
+[![Downloads](https://img.shields.io/npm/dm/mcp-server-generator.svg)](https://www.npmjs.com/package/mcp-server-generator)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+> **📦 Available on npm**: [`mcp-server-generator`](https://www.npmjs.com/package/mcp-server-generator) - 442kB of production-ready MCP server templates
 
 ## ✨ **Modern Architecture**
 
@@ -15,10 +21,23 @@ A modern CLI tool for generating production-ready Model Context Protocol (MCP) s
 
 ```bash
 # Create a comprehensive MCP server with Data Analysis Assistant
+npx mcp-server-generator my-analysis-server
+
+# Alternative command (backwards compatibility)
 npx create-mcp my-analysis-server
 
 # Or specify custom options
-npx create-mcp my-analysis-server --transport both --skip-install
+npx mcp-server-generator my-analysis-server --transport both --skip-install
+```
+
+## 📦 Quick Installation
+
+```bash
+# One-time usage (recommended)
+npx mcp-server-generator my-project
+
+# Global installation
+npm install -g mcp-server-generator
 ```
 
 ## CLI Options
@@ -154,7 +173,7 @@ After creating a project, you get a comprehensive Data Analysis Assistant:
 
 ```bash
 # Create and enter project
-npx create-mcp my-analysis-server
+npx mcp-server-generator my-analysis-server
 cd my-analysis-server
 
 # 1️⃣ See everything at once
@@ -261,7 +280,7 @@ npm run build
 
 # Test locally
 npm link
-create-mcp test-analysis-server
+mcp-server-generator test-analysis-server
 ```
 
 ### Generated Project Dependencies
@@ -414,4 +433,23 @@ This project is inspired by and builds upon:
 
 ---
 
-**Create MCP CLI** - Generate production-ready Model Context Protocol servers with comprehensive Data Analysis Assistant and integrated testing.
+**MCP Server Generator** - Generate production-ready Model Context Protocol servers with comprehensive Data Analysis Assistant and integrated testing.
+
+## 📦 Installation & Usage
+
+### Global Installation
+```bash
+npm install -g mcp-server-generator
+mcp-server-generator my-project
+```
+
+### One-time Usage (Recommended)
+```bash
+npx mcp-server-generator my-project
+```
+
+### Package Information
+- **npm Package**: [mcp-server-generator](https://www.npmjs.com/package/mcp-server-generator)
+- **GitHub**: [LinuxDevil/Create-MCP](https://github.com/LinuxDevil/Create-MCP)
+- **Size**: 442 kB (155 files)
+- **Commands**: `mcp-server-generator` or `create-mcp`
