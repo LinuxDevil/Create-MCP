@@ -59,7 +59,7 @@ export async function updateToolRegistry(
 
   let content = await fs.readFile(registryPath, 'utf-8');
 
-  if (!content.includes(registryUpdate.addImport.split(' ')[1])) {
+  if (!content.includes(registryUpdate.addImport)) {
     const importRegex = /import.*from.*['""];/g;
     const imports = content.match(importRegex);
     
@@ -124,7 +124,7 @@ export async function updateResourceRegistry(
 
   let content = await fs.readFile(registryPath, 'utf-8');
 
-  if (!content.includes(registryUpdate.addImport.split(' ')[1])) {
+  if (!content.includes(registryUpdate.addImport)) {
     const importRegex = /import.*from.*['""];/g;
     const imports = content.match(importRegex);
     
@@ -184,7 +184,7 @@ export async function updatePromptRegistry(
 
   let content = await fs.readFile(registryPath, 'utf-8');
 
-  if (!content.includes(registryUpdate.addImport.split(' ')[1])) {
+  if (!content.includes(registryUpdate.addImport)) {
     const importRegex = /import.*from.*['""];/g;
     const imports = content.match(importRegex);
     
@@ -273,7 +273,7 @@ async function updateToolRegistryWithAutoDiscovery(
 
   let content = await fs.readFile(registryPath, 'utf-8');
 
-  if (!content.includes(registryUpdate.addImport.split(' ')[1])) {
+  if (!content.includes(registryUpdate.addImport)) {
     const importRegex = /import.*from.*['""];/g;
     const imports = content.match(importRegex);
     
@@ -334,7 +334,7 @@ async function updateResourceRegistryWithAutoDiscovery(
 
   let content = await fs.readFile(registryPath, 'utf-8');
 
-  if (!content.includes(registryUpdate.addImport.split(' ')[1])) {
+  if (!content.includes(registryUpdate.addImport)) {
     const importRegex = /import.*from.*['""];/g;
     const imports = content.match(importRegex);
     
@@ -395,7 +395,7 @@ async function updatePromptRegistryWithAutoDiscovery(
 
   let content = await fs.readFile(registryPath, 'utf-8');
 
-  if (!content.includes(registryUpdate.addImport.split(' ')[1])) {
+  if (!content.includes(registryUpdate.addImport)) {
     const importRegex = /import.*from.*['""];/g;
     const imports = content.match(importRegex);
     
