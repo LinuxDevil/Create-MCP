@@ -1,0 +1,487 @@
+/**
+ * Elicitation Service for {{PROJECT_NAME}}
+ * Provides interactive guidance and information gathering capabilities
+ */
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+import { logger } from "../utils/logger.js";
+import { ElicitationConfig } from "../core/config.js";
+
+export interface ElicitationSession {
+  id: string;
+  strategy: 'guided' | 'exploratory' | 'targeted';
+  state: 'active' | 'completed' | 'aborted';
+  iterations: number;
+  maxIterations: number;
+  startTime: Date;
+  lastActivity: Date;
+  context: any;
+  responses: Array<{
+    question: string;
+    answer: string;
+    timestamp: Date;
+  }>;
+}
+
+export interface ElicitationStats {
+  toolCalls: number;
+  resourceAccess: number;
+  promptExecutions: number;
+  elicitationSessions: number;
+  samplingOperations: number;
+}
+
+export class ElicitationService {
+  private config: ElicitationConfig;
+  private stats: ElicitationStats;
+  private sessions: Map<string, ElicitationSession> = new Map();
+
+  constructor(config: ElicitationConfig, stats: ElicitationStats) {
+    this.config = config;
+    this.stats = stats;
+  }
+
+  /**
+   * Register elicitation tools with the MCP server
+   */
+  public registerTools(server: McpServer): void {
+    // Start elicitation session tool
+    server.registerTool(
+      "start-elicitation",
+      {
+        title: "Start Elicitation Session",
+        description: "Begin an interactive elicitation session for guided information gathering",
+        inputSchema: {
+          topic: z.string().describe("Topic or domain to explore"),
+          strategy: z.enum(['guided', 'exploratory', 'targeted']).optional()
+            .describe("Elicitation strategy"),
+          context: z.record(z.any()).optional().describe("Initial context"),
+          maxIterations: z.number().min(1).max(20).optional()
+            .describe("Maximum number of iterations")
+        }
+      },
+      async ({ topic, strategy = this.config.defaultStrategy, context = {}, maxIterations = this.config.maxIterations }) => {
+        this.stats.elicitationSessions++;
+        const session = this.startElicitationSession(topic, strategy, context, maxIterations);
+        
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              sessionId: session.id,
+              strategy: session.strategy,
+              firstQuestion: this.generateFirstQuestion(topic, strategy, context),
+              instructions: this.getSessionInstructions(strategy)
+            }, null, 2)
+          }]
+        };
+      }
+    );
+
+    // Continue elicitation session tool
+    server.registerTool(
+      "continue-elicitation",
+      {
+        title: "Continue Elicitation Session",
+        description: "Continue an active elicitation session with a response",
+        inputSchema: {
+          sessionId: z.string().describe("Elicitation session ID"),
+          response: z.string().describe("Response to the current question"),
+          metadata: z.record(z.any()).optional().describe("Additional metadata")
+        }
+      },
+      async ({ sessionId, response, metadata = {} }) => {
+        const result = this.continueElicitationSession(sessionId, response, metadata);
+        
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(result, null, 2)
+          }]
+        };
+      }
+    );
+
+    // Get elicitation status tool
+    server.registerTool(
+      "get-elicitation-status",
+      {
+        title: "Get Elicitation Status",
+        description: "Get status and summary of elicitation sessions",
+        inputSchema: {
+          sessionId: z.string().optional().describe("Specific session ID to check")
+        }
+      },
+      async ({ sessionId }) => {
+        const status = sessionId ? 
+          this.getSessionStatus(sessionId) : 
+          this.getAllSessionsStatus();
+        
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(status, null, 2)
+          }]
+        };
+      }
+    );
+
+    logger.debug("Elicitation tools registered successfully");
+  }
+
+  /**
+   * Register elicitation prompts with the MCP server
+   */
+  public registerPrompts(server: McpServer): void {
+    // Interactive exploration prompt
+    server.registerPrompt(
+      "interactive-exploration",
+      {
+        title: "Interactive Exploration",
+        description: "Generate interactive exploration questions for a topic",
+        argsSchema: {
+          topic: z.string().describe("Topic to explore"),
+          depth: z.enum(['surface', 'moderate', 'deep']).describe("Exploration depth"),
+          focus: z.string().optional().describe("Specific focus area")
+        }
+      },
+      ({ topic, depth, focus }) => {
+        this.stats.promptExecutions++;
+        const questions = this.generateExplorationQuestions(topic, depth, focus);
+        
+        return {
+          messages: [{
+            role: "user",
+            content: {
+              type: "text",
+              text: `Generate ${depth} exploration questions about: ${topic}${focus ? ` (focus: ${focus})` : ''}\n\nSuggested questions:\n${questions.join('\n')}`
+            }
+          }]
+        };
+      }
+    );
+
+    // Guided discovery prompt
+    server.registerPrompt(
+      "guided-discovery",
+      {
+        title: "Guided Discovery",
+        description: "Create guided discovery sessions for knowledge elicitation",
+        argsSchema: {
+          domain: z.string().describe("Knowledge domain"),
+          expertise: z.enum(['novice', 'intermediate', 'expert']).describe("User expertise level"),
+          goals: z.string().describe("Discovery goals (comma-separated)")
+        }
+      },
+      ({ domain, expertise, goals }) => {
+        this.stats.promptExecutions++;
+        
+        const goalsArray = goals ? goals.split(',').map(g => g.trim()) : [];
+        
+        return {
+          messages: [{
+            role: "user",
+            content: {
+              type: "text",
+              text: `Create a guided discovery session for ${expertise} level user in ${domain}.\n\nGoals: ${goalsArray.join(', ')}\n\nPlease provide a structured approach with progressive questions and activities.`
+            }
+          }]
+        };
+      }
+    );
+
+    logger.debug("Elicitation prompts registered successfully");
+  }
+
+  /**
+   * Start a new elicitation session
+   */
+  private startElicitationSession(
+    topic: string, 
+    strategy: 'guided' | 'exploratory' | 'targeted',
+    context: any,
+    maxIterations: number
+  ): ElicitationSession {
+    const sessionId = this.generateSessionId();
+    
+    const session: ElicitationSession = {
+      id: sessionId,
+      strategy,
+      state: 'active',
+      iterations: 0,
+      maxIterations,
+      startTime: new Date(),
+      lastActivity: new Date(),
+      context: { topic, ...context },
+      responses: []
+    };
+
+    this.sessions.set(sessionId, session);
+    logger.info(`Started elicitation session: ${sessionId} for topic: ${topic}`);
+    
+    return session;
+  }
+
+  /**
+   * Continue an elicitation session
+   */
+  private continueElicitationSession(sessionId: string, response: string, metadata: any): any {
+    const session = this.sessions.get(sessionId);
+    
+    if (!session) {
+      return { error: "Session not found", sessionId };
+    }
+
+    if (session.state !== 'active') {
+      return { error: "Session not active", sessionId, state: session.state };
+    }
+
+    // Record the response
+    session.responses.push({
+      question: this.getCurrentQuestion(session),
+      answer: response,
+      timestamp: new Date()
+    });
+
+    session.iterations++;
+    session.lastActivity = new Date();
+
+    // Generate next question or complete session
+    if (session.iterations >= session.maxIterations || this.shouldCompleteSession(session, response)) {
+      session.state = 'completed';
+      return {
+        sessionId,
+        status: 'completed',
+        summary: this.generateSessionSummary(session),
+        totalIterations: session.iterations
+      };
+    }
+
+    const nextQuestion = this.generateNextQuestion(session, response);
+    
+    return {
+      sessionId,
+      status: 'active',
+      iteration: session.iterations,
+      nextQuestion,
+      progress: (session.iterations / session.maxIterations) * 100
+    };
+  }
+
+  /**
+   * Generate the first question for a session
+   */
+  private generateFirstQuestion(topic: string, strategy: string, context: any): string {
+    const questions = {
+      guided: `Let's explore ${topic} step by step. What specific aspect of ${topic} are you most interested in learning about?`,
+      exploratory: `I'd like to understand your perspective on ${topic}. What comes to mind when you think about this topic?`,
+      targeted: `To help focus our discussion on ${topic}, what specific problem or question are you trying to solve?`
+    };
+
+    return questions[strategy as keyof typeof questions] || questions.exploratory;
+  }
+
+  /**
+   * Generate next question based on session context
+   */
+  private generateNextQuestion(session: ElicitationSession, lastResponse: string): string {
+    const { strategy, context, responses } = session;
+    
+    // Analyze previous responses to generate contextual next question
+    const questionBank = {
+      guided: [
+        "Can you elaborate on that aspect?",
+        "What challenges have you encountered with this?",
+        "How does this relate to your overall goals?",
+        "What would an ideal solution look like?",
+        "Are there any constraints we should consider?"
+      ],
+      exploratory: [
+        "That's interesting. What led you to that perspective?",
+        "Can you think of any examples that illustrate this?",
+        "How might this connect to other areas?",
+        "What questions does this raise for you?",
+        "If you could change one thing about this, what would it be?"
+      ],
+      targeted: [
+        "Let's dig deeper into that specific point.",
+        "What data or evidence supports this view?",
+        "How critical is this to your success?",
+        "What would happen if this wasn't addressed?",
+        "Who else is affected by this issue?"
+      ]
+    };
+
+    const questions = questionBank[strategy] || questionBank.exploratory;
+    const questionIndex = session.iterations % questions.length;
+    
+    return questions[questionIndex];
+  }
+
+  /**
+   * Get current question for a session
+   */
+  private getCurrentQuestion(session: ElicitationSession): string {
+    if (session.responses.length === 0) {
+      return this.generateFirstQuestion(session.context.topic, session.strategy, session.context);
+    }
+    return "Previous question"; // Would need to track this better in real implementation
+  }
+
+  /**
+   * Determine if session should be completed
+   */
+  private shouldCompleteSession(session: ElicitationSession, response: string): boolean {
+    // Simple heuristics for completion
+    const completionIndicators = [
+      'that covers everything',
+      'i think we\'re done',
+      'no more questions',
+      'that\'s all',
+      'complete'
+    ];
+
+    return completionIndicators.some(indicator => 
+      response.toLowerCase().includes(indicator)
+    );
+  }
+
+  /**
+   * Generate session summary
+   */
+  private generateSessionSummary(session: ElicitationSession): any {
+    return {
+      topic: session.context.topic,
+      strategy: session.strategy,
+      duration: new Date().getTime() - session.startTime.getTime(),
+      totalResponses: session.responses.length,
+      keyInsights: this.extractKeyInsights(session),
+      completionReason: session.iterations >= session.maxIterations ? 'max_iterations' : 'natural_completion'
+    };
+  }
+
+  /**
+   * Extract key insights from session responses
+   */
+  private extractKeyInsights(session: ElicitationSession): string[] {
+    // Simple insight extraction based on response length and keywords
+    return session.responses
+      .filter(r => r.answer.length > 50)
+      .slice(0, 3)
+      .map(r => `Key insight: ${r.answer.substring(0, 100)}...`);
+  }
+
+  /**
+   * Generate exploration questions
+   */
+  private generateExplorationQuestions(topic: string, depth: string, focus?: string): string[] {
+    const questionTemplates = {
+      surface: [
+        `What is your understanding of ${topic}?`,
+        `How familiar are you with ${topic}?`,
+        `What interests you most about ${topic}?`
+      ],
+      moderate: [
+        `What challenges exist in ${topic}?`,
+        `How does ${topic} impact your work/life?`,
+        `What would you like to achieve with ${topic}?`,
+        `What resources do you need for ${topic}?`
+      ],
+      deep: [
+        `What are the underlying principles of ${topic}?`,
+        `How would you innovate in the field of ${topic}?`,
+        `What future trends do you see in ${topic}?`,
+        `How would you teach ${topic} to others?`
+      ]
+    };
+
+    let questions = questionTemplates[depth as keyof typeof questionTemplates] || questionTemplates.moderate;
+    
+    if (focus) {
+      questions = questions.map(q => q.replace(topic, `${topic} (specifically ${focus})`));
+    }
+
+    return questions;
+  }
+
+  /**
+   * Get session instructions
+   */
+  private getSessionInstructions(strategy: string): string {
+    const instructions = {
+      guided: "This is a guided session. I'll ask structured questions to help you explore the topic systematically.",
+      exploratory: "This is an exploratory session. Feel free to share your thoughts and we'll discover insights together.",
+      targeted: "This is a targeted session. We'll focus on specific aspects to achieve your goals efficiently."
+    };
+
+    return instructions[strategy as keyof typeof instructions] || instructions.exploratory;
+  }
+
+  /**
+   * Get status of a specific session
+   */
+  private getSessionStatus(sessionId: string): any {
+    const session = this.sessions.get(sessionId);
+    
+    if (!session) {
+      return { error: "Session not found", sessionId };
+    }
+
+    return {
+      sessionId: session.id,
+      state: session.state,
+      strategy: session.strategy,
+      iterations: session.iterations,
+      maxIterations: session.maxIterations,
+      progress: (session.iterations / session.maxIterations) * 100,
+      duration: new Date().getTime() - session.startTime.getTime(),
+      lastActivity: session.lastActivity
+    };
+  }
+
+  /**
+   * Get status of all sessions
+   */
+  private getAllSessionsStatus(): any {
+    const activeSessions = Array.from(this.sessions.values()).filter(s => s.state === 'active');
+    const completedSessions = Array.from(this.sessions.values()).filter(s => s.state === 'completed');
+
+    return {
+      totalSessions: this.sessions.size,
+      activeSessions: activeSessions.length,
+      completedSessions: completedSessions.length,
+      sessions: Array.from(this.sessions.values()).map(s => ({
+        id: s.id,
+        state: s.state,
+        strategy: s.strategy,
+        topic: s.context.topic,
+        iterations: s.iterations
+      }))
+    };
+  }
+
+  /**
+   * Generate unique session ID
+   */
+  private generateSessionId(): string {
+    return `elicit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Cleanup and shutdown
+   */
+  public async shutdown(): Promise<void> {
+    logger.info("Shutting down elicitation service...");
+    
+    // Mark all active sessions as aborted
+    for (const session of this.sessions.values()) {
+      if (session.state === 'active') {
+        session.state = 'aborted';
+      }
+    }
+
+    this.sessions.clear();
+    logger.info("Elicitation service shutdown complete");
+  }
+}

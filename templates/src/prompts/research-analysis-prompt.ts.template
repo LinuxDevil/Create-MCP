@@ -1,0 +1,630 @@
+/**
+ * Research Analysis Prompt for {{PROJECT_NAME}}
+ * Comprehensive prompt demonstrating all MCP prompt capabilities:
+ * - Multiple analysis methodologies 
+ * - Flexible context and domain support
+ * - Integration with data analysis workflows
+ * - Structured output generation
+ */
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+import { logger } from "../utils/logger.js";
+import { BasePrompt, PromptStats } from "./index.js";
+
+export class ResearchAnalysisPrompt implements BasePrompt {
+  public readonly name = "research-analysis";
+
+  public register(server: McpServer, stats: PromptStats): void {
+    server.registerPrompt(
+      this.name,
+      {
+        title: "Research Analysis Prompt Generator",
+        description: "Generate comprehensive research analysis prompts for data analysis, code review, system design, and more",
+        argsSchema: {
+          topic: z.string().describe("Research topic, question, or subject to analyze"),
+          methodology: z.enum([
+            "data-analysis", "code-review", "system-design", "literature-review", 
+            "comparative-analysis", "case-study", "experimental-design", "survey-research"
+          ]).describe("Research methodology to apply"),
+          context: z.string().optional().describe("Domain, business, or academic context"),
+          depth: z.enum(["overview", "detailed", "comprehensive", "expert"]).optional().describe("Depth of analysis required"),
+          audience: z.enum(["general", "technical", "academic", "executive"]).optional().describe("Target audience"),
+          constraints: z.string().optional().describe("Any constraints, limitations, or specific requirements"),
+          output_format: z.enum(["structured", "narrative", "academic", "business"]).optional().describe("Preferred output format"),
+          include_methodology: z.string().optional().describe("Include methodology explanation in prompt (true/false)"),
+          include_examples: z.string().optional().describe("Include examples and templates in prompt (true/false)")
+        }
+      },
+      ({ 
+        topic, 
+        methodology, 
+        context, 
+        depth = 'detailed', 
+        audience = 'technical',
+        constraints,
+        output_format = 'structured',
+        include_methodology = 'true',
+        include_examples = 'false'
+      }) => {
+        logger.debug(`Research analysis prompt executed for ${methodology} methodology`);
+        stats.promptExecutions++;
+
+        const prompt = this.generateResearchPrompt({
+          topic: topic || '',
+          methodology: methodology || 'data-analysis',
+          context,
+          depth,
+          audience,
+          constraints,
+          output_format,
+          include_methodology: include_methodology === 'true',
+          include_examples: include_examples === 'true'
+        });
+
+        return {
+          messages: [{
+            role: "user",
+            content: {
+              type: "text",
+              text: prompt
+            }
+          }]
+        };
+      }
+    );
+
+    logger.debug("Research Analysis prompt registered successfully");
+  }
+
+  /**
+   * Generate comprehensive research analysis prompt
+   */
+  private generateResearchPrompt(params: {
+    topic: string;
+    methodology: string;
+    context?: string;
+    depth: string;
+    audience: string;
+    constraints?: string;
+    output_format: string;
+    include_methodology: boolean;
+    include_examples: boolean;
+  }): string {
+    const { 
+      topic, 
+      methodology, 
+      context, 
+      depth, 
+      audience, 
+      constraints,
+      output_format,
+      include_methodology,
+      include_examples
+    } = params;
+
+    let prompt = `# Research Analysis Request\n\n`;
+
+    // Add context if provided
+    if (context) {
+      prompt += `## Context\n${context}\n\n`;
+    }
+
+    // Add methodology-specific content
+    prompt += this.getMethodologySection(methodology, topic, depth);
+
+    // Add methodology explanation if requested
+    if (include_methodology) {
+      prompt += this.getMethodologyExplanation(methodology);
+    }
+
+    // Add audience-specific guidance
+    prompt += this.getAudienceGuidance(audience, output_format);
+
+    // Add constraints if provided
+    if (constraints) {
+      prompt += `## Constraints & Requirements\n${constraints}\n\n`;
+    }
+
+    // Add examples if requested
+    if (include_examples) {
+      prompt += this.getExamplesSection(methodology);
+    }
+
+    // Add output structure guidance
+    prompt += this.getOutputStructure(output_format, depth);
+
+    return prompt;
+  }
+
+  /**
+   * Get methodology-specific section
+   */
+  private getMethodologySection(methodology: string, topic: string, depth: string): string {
+    const methodologies: { [key: string]: any } = {
+      "data-analysis": {
+        title: "Data Analysis Research",
+        description: `Conduct comprehensive data analysis research on: ${topic}`,
+        focus_areas: [
+          "Data collection and preparation strategies",
+          "Appropriate analytical methods and techniques", 
+          "Statistical validity and significance",
+          "Pattern identification and interpretation",
+          "Actionable insights and recommendations"
+        ],
+        key_questions: [
+          "What data sources are most relevant and reliable?",
+          "Which analytical approaches best suit this research question?",
+          "How can we ensure statistical rigor and validity?",
+          "What patterns or relationships should we investigate?",
+          "How can findings be translated into actionable insights?"
+        ]
+      },
+
+      "code-review": {
+        title: "Code Review Research",
+        description: `Conduct thorough code review research for: ${topic}`,
+        focus_areas: [
+          "Code quality and maintainability assessment",
+          "Security vulnerability identification",
+          "Performance optimization opportunities",
+          "Best practices and standards compliance",
+          "Architecture and design pattern evaluation"
+        ],
+        key_questions: [
+          "What are the code quality standards for this project type?",
+          "What security vulnerabilities should be prioritized?",
+          "How can performance be measured and improved?",
+          "Which design patterns are most appropriate?",
+          "What refactoring opportunities exist?"
+        ]
+      },
+
+      "system-design": {
+        title: "System Design Research",
+        description: `Research system design approaches for: ${topic}`,
+        focus_areas: [
+          "Architecture patterns and trade-offs",
+          "Scalability and performance requirements",
+          "Security and compliance considerations",
+          "Technology stack evaluation",
+          "Implementation strategy and roadmap"
+        ],
+        key_questions: [
+          "What architectural patterns best fit the requirements?",
+          "How should the system handle scale and growth?",
+          "What security measures are necessary?",
+          "Which technologies provide the best fit?",
+          "What is the optimal implementation approach?"
+        ]
+      },
+
+      "literature-review": {
+        title: "Literature Review Research",
+        description: `Conduct systematic literature review on: ${topic}`,
+        focus_areas: [
+          "Current state of research in the field",
+          "Key theories and methodological approaches",
+          "Research gaps and opportunities",
+          "Conflicting findings and debates",
+          "Future research directions"
+        ],
+        key_questions: [
+          "What is the current consensus in the field?",
+          "What methodologies are most commonly used?",
+          "Where are the significant research gaps?",
+          "What controversies or debates exist?",
+          "What are the emerging trends and directions?"
+        ]
+      },
+
+      "comparative-analysis": {
+        title: "Comparative Analysis Research",
+        description: `Conduct comparative analysis research on: ${topic}`,
+        focus_areas: [
+          "Identification of comparison criteria",
+          "Systematic evaluation framework",
+          "Strengths and weaknesses assessment",
+          "Trade-off analysis and implications",
+          "Recommendation synthesis"
+        ],
+        key_questions: [
+          "What are the most important comparison criteria?",
+          "How can we ensure fair and systematic comparison?",
+          "What are the key trade-offs to consider?",
+          "Which option best meets the requirements?",
+          "What are the implementation implications?"
+        ]
+      },
+
+      "case-study": {
+        title: "Case Study Research",
+        description: `Develop comprehensive case study analysis of: ${topic}`,
+        focus_areas: [
+          "Case background and context analysis",
+          "Problem identification and definition",
+          "Solution approach and methodology",
+          "Results and outcomes evaluation",
+          "Lessons learned and generalizability"
+        ],
+        key_questions: [
+          "What is the relevant background and context?",
+          "How was the problem defined and approached?",
+          "What solutions were implemented and why?",
+          "What were the outcomes and their significance?",
+          "What lessons can be applied elsewhere?"
+        ]
+      },
+
+      "experimental-design": {
+        title: "Experimental Design Research",
+        description: `Design experimental research approach for: ${topic}`,
+        focus_areas: [
+          "Hypothesis formulation and testing",
+          "Experimental design and controls",
+          "Variable identification and measurement",
+          "Data collection and analysis plan",
+          "Validity and reliability considerations"
+        ],
+        key_questions: [
+          "What hypotheses should be tested?",
+          "What experimental design is most appropriate?",
+          "How should variables be measured and controlled?",
+          "What data collection methods ensure quality?",
+          "How can validity and reliability be ensured?"
+        ]
+      },
+
+      "survey-research": {
+        title: "Survey Research Design",
+        description: `Design survey research methodology for: ${topic}`,
+        focus_areas: [
+          "Research objectives and question formulation",
+          "Target population and sampling strategy",
+          "Survey instrument design and validation",
+          "Data collection and response optimization",
+          "Analysis and interpretation framework"
+        ],
+        key_questions: [
+          "What are the specific research objectives?",
+          "Who is the target population and how to sample?",
+          "How should questions be structured and validated?",
+          "What methods will maximize response rates?",
+          "How should data be analyzed and interpreted?"
+        ]
+      }
+    };
+
+    const method = methodologies[methodology] || methodologies["data-analysis"];
+    
+    let section = `## ${method.title}\n\n`;
+    section += `${method.description}\n\n`;
+    
+    if (depth === 'comprehensive' || depth === 'expert') {
+      section += `### Focus Areas\n`;
+      method.focus_areas.forEach((area: string, index: number) => {
+        section += `${index + 1}. ${area}\n`;
+      });
+      section += `\n`;
+
+      section += `### Key Research Questions\n`;
+      method.key_questions.forEach((question: string, index: number) => {
+        section += `${index + 1}. ${question}\n`;
+      });
+      section += `\n`;
+    }
+
+    return section;
+  }
+
+  /**
+   * Get methodology explanation
+   */
+  private getMethodologyExplanation(methodology: string): string {
+    const explanations: { [key: string]: string } = {
+      "data-analysis": `
+## Data Analysis Methodology
+
+Apply systematic data analysis approach:
+1. **Exploratory Phase**: Understand data characteristics and quality
+2. **Descriptive Phase**: Summarize patterns and relationships
+3. **Diagnostic Phase**: Investigate causes and correlations
+4. **Predictive Phase**: Identify trends and forecast outcomes
+5. **Prescriptive Phase**: Generate actionable recommendations
+
+Use appropriate sampling strategies for large datasets and consider elicitation for interactive guidance.
+`,
+
+      "code-review": `
+## Code Review Methodology
+
+Follow systematic code review process:
+1. **Structure Review**: Assess overall architecture and organization
+2. **Quality Review**: Evaluate coding standards and best practices
+3. **Security Review**: Identify vulnerabilities and risks
+4. **Performance Review**: Analyze efficiency and optimization opportunities
+5. **Maintainability Review**: Assess long-term sustainability
+
+Focus on constructive feedback with specific, actionable recommendations.
+`,
+
+      "system-design": `
+## System Design Methodology
+
+Apply systematic design approach:
+1. **Requirements Analysis**: Define functional and non-functional requirements
+2. **Architecture Design**: Select patterns and overall structure
+3. **Component Design**: Define interfaces and interactions
+4. **Technology Selection**: Choose appropriate tools and frameworks
+5. **Implementation Planning**: Create deployment and scaling strategy
+
+Consider scalability, security, and maintainability throughout the design process.
+`,
+
+      "literature-review": `
+## Literature Review Methodology
+
+Follow systematic review process:
+1. **Search Strategy**: Define keywords and databases
+2. **Selection Criteria**: Establish inclusion/exclusion criteria
+3. **Quality Assessment**: Evaluate source credibility and relevance
+4. **Data Extraction**: Systematically extract key information
+5. **Synthesis**: Analyze patterns and draw conclusions
+
+Ensure comprehensive coverage while maintaining quality standards.
+`,
+
+      "comparative-analysis": `
+## Comparative Analysis Methodology
+
+Apply structured comparison framework:
+1. **Criteria Definition**: Establish evaluation dimensions
+2. **Data Collection**: Gather comparable information
+3. **Systematic Evaluation**: Apply criteria consistently
+4. **Trade-off Analysis**: Assess relative advantages/disadvantages
+5. **Recommendation**: Synthesize findings into actionable advice
+
+Maintain objectivity and consider multiple perspectives throughout.
+`,
+
+      "case-study": `
+## Case Study Methodology
+
+Follow comprehensive case analysis:
+1. **Context Analysis**: Understand background and environment
+2. **Problem Definition**: Clearly articulate the challenge
+3. **Solution Analysis**: Examine approaches and decisions
+4. **Outcome Evaluation**: Assess results and effectiveness
+5. **Lesson Extraction**: Identify transferable insights
+
+Focus on depth over breadth while maintaining analytical rigor.
+`,
+
+      "experimental-design": `
+## Experimental Design Methodology
+
+Apply rigorous experimental approach:
+1. **Hypothesis Formation**: Define testable predictions
+2. **Design Selection**: Choose appropriate experimental structure
+3. **Variable Control**: Identify and manage confounding factors
+4. **Data Collection**: Implement systematic measurement
+5. **Statistical Analysis**: Apply appropriate analytical methods
+
+Ensure validity, reliability, and ethical considerations throughout.
+`,
+
+      "survey-research": `
+## Survey Research Methodology
+
+Follow systematic survey design:
+1. **Objective Definition**: Clarify research goals and questions
+2. **Population Sampling**: Define target group and sampling method
+3. **Instrument Design**: Create valid and reliable questions
+4. **Data Collection**: Implement effective distribution strategy
+5. **Analysis Planning**: Prepare analytical framework
+
+Balance comprehensiveness with response burden throughout design.
+`
+    };
+
+    return explanations[methodology] || explanations["data-analysis"];
+  }
+
+  /**
+   * Get audience-specific guidance
+   */
+  private getAudienceGuidance(audience: string, outputFormat: string): string {
+    const guidance: { [key: string]: string } = {
+      "general": "Present findings in accessible language with clear explanations of technical concepts.",
+      "technical": "Include technical details, methodological considerations, and implementation specifics.",
+      "academic": "Follow academic conventions with proper citations, methodology discussion, and theoretical context.",
+      "executive": "Focus on business implications, strategic insights, and actionable recommendations."
+    };
+
+    const formatGuidance: { [key: string]: string } = {
+      "structured": "Organize content with clear headings, bullet points, and logical flow.",
+      "narrative": "Present as flowing narrative with smooth transitions between concepts.",
+      "academic": "Follow academic paper structure with abstract, methodology, results, and discussion.",
+      "business": "Use business report format with executive summary, findings, and recommendations."
+    };
+
+    return `## Audience & Format Guidelines\n\n**Target Audience**: ${guidance[audience]}\n\n**Output Format**: ${formatGuidance[outputFormat]}\n\n`;
+  }
+
+  /**
+   * Get examples section
+   */
+  private getExamplesSection(methodology: string): string {
+    const examples: { [key: string]: string } = {
+      "data-analysis": `
+## Example Analysis Framework
+
+**Sample Data Analysis Workflow:**
+1. Load and validate dataset
+2. Perform exploratory analysis to understand structure
+3. Apply appropriate sampling if dataset is large
+4. Conduct statistical analysis based on research questions
+5. Generate insights and recommendations
+
+**Tools Integration:**
+- Use data-analysis tool with exploratory type for initial understanding
+- Apply sampling strategies for large datasets
+- Enable elicitation for interactive guidance
+- Generate multiple analysis types for comprehensive insights
+`,
+
+      "code-review": `
+## Example Code Review Framework
+
+**Sample Review Checklist:**
+1. Architecture and design pattern adherence
+2. Code organization and modularity
+3. Naming conventions and documentation
+4. Error handling and edge cases
+5. Security considerations and vulnerabilities
+6. Performance optimization opportunities
+7. Testing coverage and quality
+
+**Focus Areas by Language:**
+- Consider language-specific best practices
+- Review framework and library usage
+- Assess security patterns for the technology stack
+`,
+
+      "system-design": `
+## Example System Design Framework
+
+**Sample Design Process:**
+1. Functional requirements definition
+2. Non-functional requirements (scale, performance, security)
+3. High-level architecture design
+4. Component interface specification
+5. Data flow and storage design
+6. Technology stack selection
+7. Deployment and scaling strategy
+
+**Architecture Patterns:**
+- Microservices vs monolithic considerations
+- Event-driven vs request-response patterns
+- Synchronous vs asynchronous communication
+`
+    };
+
+    return examples[methodology] || "";
+  }
+
+  /**
+   * Get output structure guidance
+   */
+  private getOutputStructure(outputFormat: string, depth: string): string {
+    let structure = `## Expected Output Structure\n\n`;
+
+    switch (outputFormat) {
+      case "structured":
+        structure += `Organize your response with the following structure:
+
+### 1. Executive Summary
+- Key findings and insights
+- Main conclusions and recommendations
+
+### 2. Methodology
+- Research approach and methods used
+- Data sources and analytical techniques
+
+### 3. Detailed Analysis
+- Systematic examination of findings
+- Supporting evidence and examples
+
+### 4. Insights & Implications
+- Significant patterns and relationships
+- Broader implications and significance
+
+### 5. Recommendations
+- Actionable next steps
+- Implementation considerations
+- Risk mitigation strategies`;
+        break;
+
+      case "academic":
+        structure += `Follow academic paper structure:
+
+### 1. Abstract
+- Brief summary of research question, methodology, and findings
+
+### 2. Introduction
+- Background context and research objectives
+- Literature review and theoretical framework
+
+### 3. Methodology
+- Research design and analytical approach
+- Data sources and collection methods
+
+### 4. Results
+- Systematic presentation of findings
+- Statistical analysis and evidence
+
+### 5. Discussion
+- Interpretation of results
+- Implications and limitations
+
+### 6. Conclusion
+- Summary of contributions and future research directions`;
+        break;
+
+      case "business":
+        structure += `Use business report format:
+
+### 1. Executive Summary
+- Key findings and business impact
+- Strategic recommendations
+
+### 2. Background & Objectives
+- Business context and goals
+- Success criteria and constraints
+
+### 3. Analysis & Findings
+- Systematic evaluation of data/information
+- Supporting evidence and metrics
+
+### 4. Strategic Implications
+- Business impact and opportunities
+- Risk assessment and mitigation
+
+### 5. Action Plan
+- Specific recommendations with timelines
+- Resource requirements and implementation steps`;
+        break;
+
+      case "narrative":
+      default:
+        structure += `Present as coherent narrative addressing:
+
+1. **Context & Background**: Set the stage for the analysis
+2. **Methodology & Approach**: Explain how the research was conducted
+3. **Key Findings**: Present discoveries in logical sequence
+4. **Analysis & Interpretation**: Discuss meaning and significance
+5. **Conclusions & Recommendations**: Synthesize insights into actionable advice
+
+Maintain smooth transitions between sections and build arguments progressively.`;
+        break;
+    }
+
+    if (depth === 'comprehensive' || depth === 'expert') {
+      structure += `\n\n### Additional Requirements for ${depth} Analysis:
+- Include methodological assumptions and limitations
+- Provide detailed statistical or technical analysis
+- Discuss alternative approaches and their trade-offs
+- Address potential criticisms and counterarguments
+- Suggest areas for future investigation`;
+    }
+
+    structure += `\n\n### Quality Standards:
+- Support all claims with evidence
+- Maintain objective, analytical tone
+- Provide specific, actionable recommendations
+- Include relevant examples and illustrations
+- Ensure logical flow and clear conclusions`;
+
+    return structure;
+  }
+}

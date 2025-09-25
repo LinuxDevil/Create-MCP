@@ -1,447 +1,146 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { ResourceTemplate, isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import express from "express";
-import { randomUUID } from "node:crypto";
-import { z } from "zod";
-import { logger } from "./utils/logger.js";
-import { ExampleService } from "./services/example.js";
-import { HealthChecker } from "./utils/health.js";
-
 /**
- * {{PROJECT_NAME}} - Model Context Protocol Server
+ * {{PROJECT_NAME}} - Modern Model Context Protocol Server
  * {{PROJECT_DESCRIPTION}}
  * 
- * This server provides both Stdio and HTTP transport examples
- * for the Model Context Protocol (MCP).
+ * This server demonstrates modern MCP features including:
+ * - Modular architecture with clean separation of concerns
+ * - Streamable HTTP transport (protocol 2025-03-26)
+ * - Stdio transport for command-line integration
+ * - Interactive elicitation capabilities
+ * - Advanced data sampling techniques
+ * - Comprehensive tooling and resources
+ * - Health monitoring and logging
+ * - CORS support for browser clients
  */
 
-class {{PROJECT_NAME}}Server {
-  private server: McpServer;
-  private exampleService: ExampleService;
-  private healthChecker: HealthChecker;
+import { logger } from "./utils/logger.js";
+import { ServerFactory } from "./core/server-factory.js";
+import { TransportManager } from "./transports/transport-manager.js";
 
-  constructor() {
-    this.server = new McpServer({
-      name: "{{PROJECT_NAME}}",
-      version: "1.0.0"
-    });
-
-    this.exampleService = new ExampleService();
-    this.healthChecker = new HealthChecker();
-    
-    this.setupHealthChecks();
-    this.setupServer();
-  }
-
-  private setupHealthChecks(): void {
-    // Register health checks
-    this.healthChecker.registerCheck('memory', async () => {
-      const memUsage = process.memoryUsage();
-      const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
-      
-      return {
-        name: 'memory',
-        status: heapUsedMB > 500 ? 'warn' : 'pass',
-        message: `Heap usage: ${heapUsedMB}MB`
-      };
-    });
-
-    this.healthChecker.registerCheck('uptime', async () => {
-      const uptimeSeconds = process.uptime();
-      return {
-        name: 'uptime',
-        status: 'pass',
-        message: `${Math.round(uptimeSeconds)}s`
-      };
-    });
-  }
-
-  private setupServer(): void {
-    logger.info("Setting up MCP server...");
-
-    // Register example tools
-    this.registerTools();
-    
-    // Register example resources
-    this.registerResources();
-    
-    // Register example prompts
-    this.registerPrompts();
-
-    logger.info("MCP server setup complete");
-  }
-
-  private registerTools(): void {
-    logger.debug("Registering tools...");
-
-    // Example tool: Echo
-    this.server.registerTool(
-      "echo",
-      {
-        title: "Echo Tool",
-        description: "Echoes back the provided message",
-        inputSchema: { 
-          message: z.string().describe("Message to echo back")
-        }
-      },
-      async ({ message }) => {
-        logger.info(`Echo tool called with message: ${message}`);
-        return {
-          content: [{
-            type: "text",
-            text: `Echo: ${message}`
-          }]
-        };
-      }
-    );
-
-    // Example tool: Add numbers
-    this.server.registerTool(
-      "add",
-      {
-        title: "Addition Tool",
-        description: "Add two numbers together",
-        inputSchema: { 
-          a: z.number().describe("First number"),
-          b: z.number().describe("Second number")
-        }
-      },
-      async ({ a, b }) => {
-        const result = a + b;
-        logger.info(`Addition: ${a} + ${b} = ${result}`);
-        return {
-          content: [{
-            type: "text",
-            text: `${a} + ${b} = ${result}`
-          }]
-        };
-      }
-    );
-
-    // Example tool using service
-    this.server.registerTool(
-      "get-status",
-      {
-        title: "Get Status",
-        description: "Get the current server status",
-        inputSchema: {}
-      },
-      async () => {
-        const status = await this.exampleService.getStatus();
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify(status, null, 2)
-          }]
-        };
-      }
-    );
-
-    logger.debug("Tools registered successfully");
-  }
-
-  private registerResources(): void {
-    logger.debug("Registering resources...");
-
-    // Example static resource
-    this.server.registerResource(
-      "info",
-      "info://server",
-      {
-        title: "Server Information",
-        description: "Basic information about this MCP server",
-        mimeType: "application/json"
-      },
-      async () => ({
-        contents: [{
-          uri: "info://server",
-          text: JSON.stringify({
-            name: "{{PROJECT_NAME}}",
-            version: "1.0.0",
-            description: "{{PROJECT_DESCRIPTION}}",
-            capabilities: ["tools", "resources", "prompts"],
-            timestamp: new Date().toISOString()
-          }, null, 2),
-          mimeType: "application/json"
-        }]
-      })
-    );
-
-    // Example dynamic resource using ResourceTemplate
-    this.server.registerResource(
-      "greeting",
-      new ResourceTemplate("greeting://{name}", { list: undefined }),
-      {
-        title: "Dynamic Greeting",
-        description: "Generate personalized greetings"
-      },
-      async (uri, { name }) => ({
-        contents: [{
-          uri: uri.href,
-          text: `Hello, ${name}! Welcome to {{PROJECT_NAME}}.`
-        }]
-      })
-    );
-
-    logger.debug("Resources registered successfully");
-  }
-
-  private registerPrompts(): void {
-    logger.debug("Registering prompts...");
-
-    // Example prompt
-    this.server.registerPrompt(
-      "analyze-data",
-      {
-        title: "Data Analysis Prompt",
-        description: "Analyze the provided data and generate insights",
-        argsSchema: {
-          data: z.string().describe("Data to analyze"),
-          format: z.enum(["json", "csv", "text"]).describe("Data format")
-        }
-      },
-      ({ data, format }) => ({
-        messages: [{
-          role: "user",
-          content: {
-            type: "text",
-            text: `Please analyze the following ${format} data and provide insights:\n\n${data}`
-          }
-        }]
-      })
-    );
-
-    logger.debug("Prompts registered successfully");
-  }
-
-  /**
-   * Start the server with Stdio transport
-   * Perfect for command-line tools and direct integrations
-   */
-  async startStdio(): Promise<void> {
-    logger.info("Starting MCP server with Stdio transport...");
-    
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
-    
-    logger.info("MCP server running on Stdio transport");
-  }
-
-  /**
-   * Start the server with HTTP transport
-   * Perfect for web services and remote integrations
-   */
-  async startHttp(port: number = 3000): Promise<void> {
-    logger.info(`Starting MCP server with HTTP transport on port ${port}...`);
-    
-    const app = express();
-    app.use(express.json());
-
-    // Store transports for session management
-    const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
-
-    // CORS middleware
-    app.use((req, res, next) => {
-      res.header('Access-Control-Allow-Origin', '*');
-      res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With, mcp-session-id');
-      res.header('Access-Control-Expose-Headers', 'Mcp-Session-Id');
-      
-      if (req.method === 'OPTIONS') {
-        res.sendStatus(200);
-        return;
-      }
-      next();
-    });
-
-    // Handle POST requests for client-to-server communication
-    app.post('/mcp', async (req, res) => {
-      const sessionId = req.headers['mcp-session-id'] as string | undefined;
-      let transport: StreamableHTTPServerTransport;
-
-      try {
-        if (sessionId && transports[sessionId]) {
-          // Reuse existing transport
-          transport = transports[sessionId];
-          logger.debug(`Reusing session: ${sessionId}`);
-        } else if (!sessionId && isInitializeRequest(req.body)) {
-          // New initialization request
-          logger.info("Creating new session for initialize request");
-          
-          transport = new StreamableHTTPServerTransport({
-            sessionIdGenerator: () => randomUUID(),
-            onsessioninitialized: (newSessionId) => {
-              transports[newSessionId] = transport;
-              logger.info(`New session initialized: ${newSessionId}`);
-            }
-          });
-
-          // Clean up transport when closed
-          transport.onclose = () => {
-            if (transport.sessionId) {
-              delete transports[transport.sessionId];
-              logger.info(`Session closed: ${transport.sessionId}`);
-            }
-          };
-
-          await this.server.connect(transport);
-        } else {
-          // Invalid request
-          logger.warn(`Invalid request: sessionId=${sessionId}, isInitialize=${isInitializeRequest(req.body)}`);
-          return res.status(400).json({
-            jsonrpc: '2.0',
-            error: {
-              code: -32000,
-              message: 'Bad Request: No valid session ID provided or not an initialize request',
-            },
-            id: null,
-          });
-        }
-
-        // Handle the request
-        await transport.handleRequest(req, res, req.body);
-        
-      } catch (error) {
-        logger.error('Error handling MCP request:', error);
-        
-        if (!res.headersSent) {
-          res.status(500).json({
-            jsonrpc: '2.0',
-            error: {
-              code: -32603,
-              message: 'Internal server error',
-            },
-            id: null,
-          });
-        }
-      }
-    });
-
-    // Handle GET requests for server-to-client notifications via SSE
-    app.get('/mcp', async (req, res) => {
-      const sessionId = req.headers['mcp-session-id'] as string | undefined;
-      
-      if (!sessionId || !transports[sessionId]) {
-        logger.warn(`Invalid SSE request: sessionId=${sessionId}`);
-        return res.status(400).send('Invalid or missing session ID');
-      }
-      
-      logger.debug(`SSE connection for session: ${sessionId}`);
-      const transport = transports[sessionId];
-      await transport.handleRequest(req, res);
-    });
-
-    // Handle DELETE requests for session termination
-    app.delete('/mcp', async (req, res) => {
-      const sessionId = req.headers['mcp-session-id'] as string | undefined;
-      
-      if (!sessionId || !transports[sessionId]) {
-        logger.warn(`Invalid session termination: sessionId=${sessionId}`);
-        return res.status(400).send('Invalid or missing session ID');
-      }
-      
-      logger.info(`Terminating session: ${sessionId}`);
-      const transport = transports[sessionId];
-      await transport.handleRequest(req, res);
-    });
-
-    // Health check endpoint
-    app.get('/health', async (req, res) => {
-      try {
-        const health = await this.healthChecker.getStatus();
-        const statusCode = health.status === 'healthy' ? 200 : 
-                          health.status === 'degraded' ? 200 : 503;
-        
-        res.status(statusCode).json(health);
-      } catch (error) {
-        logger.error('Health check failed:', error);
-        res.status(503).json({
-          status: 'unhealthy',
-          checks: [],
-          timestamp: new Date().toISOString(),
-          error: 'Health check failed'
-        });
-      }
-    });
-
-    // Server info endpoint
-    app.get('/info', async (req, res) => {
-      try {
-        const status = await this.exampleService.getStatus();
-        res.json({
-          server: '{{PROJECT_NAME}}',
-          version: '1.0.0',
-          description: '{{PROJECT_DESCRIPTION}}',
-          transport: 'http',
-          endpoints: {
-            mcp: '/mcp',
-            health: '/health',
-            info: '/info'
-          },
-          capabilities: status.capabilities,
-          sessions: Object.keys(transports).length
-        });
-      } catch (error) {
-        logger.error('Info endpoint failed:', error);
-        res.status(500).json({ error: 'Failed to get server info' });
-      }
-    });
-
-    app.listen(port, () => {
-      logger.info(`MCP server listening on http://localhost:${port}`);
-      logger.info('Available endpoints:');
-      logger.info('  POST /mcp - MCP communication');
-      logger.info('  GET /mcp - SSE notifications');
-      logger.info('  DELETE /mcp - Session termination');
-      logger.info('  GET /health - Health check');
-      logger.info('  GET /info - Server information');
-    });
-  }
-}
-
-// Main execution logic
+/**
+ * Main execution logic
+ */
 async function main(): Promise<void> {
-  const server = new {{PROJECT_NAME}}Server();
-  
-  // Determine transport mode from environment or command line
-  const transportMode = process.env.MCP_TRANSPORT || process.argv[2] || 'stdio';
-  const port = parseInt(process.env.PORT || '3000', 10);
-
   try {
-    switch (transportMode.toLowerCase()) {
-      case 'stdio':
-        await server.startStdio();
-        break;
-      case 'http':
-        await server.startHttp(port);
-        break;
-      default:
-        logger.error(`Unknown transport mode: ${transportMode}`);
-        logger.info('Available modes: stdio, http');
-        logger.info('Usage examples:');
-        logger.info('  npm run dev:stdio');
-        logger.info('  npm run dev:http');
-        logger.info('  MCP_TRANSPORT=http PORT=3001 npm start');
-        process.exit(1);
+    logger.info("Starting {{PROJECT_NAME}} server...");
+
+    // Parse command line arguments
+    const args = process.argv.slice(2);
+
+    // Display help if requested
+    if (args.includes('--help') || args.includes('-h')) {
+      displayHelp();
+      process.exit(0);
     }
+
+    // Create server factory
+    const serverFactory = ServerFactory.getInstance();
+
+    // Validate configuration
+    const validation = serverFactory.validateConfiguration();
+    if (!validation.valid) {
+      logger.error("Configuration validation failed:");
+      validation.errors.forEach(error => logger.error(`  - ${error}`));
+      process.exit(1);
+    }
+
+    // Create and start server
+    const server = await serverFactory.createAndStartServer({ args });
+
+    logger.info("{{PROJECT_NAME}} server started successfully");
+    
+    // Log available capabilities
+    const status = await server.getStatus();
+    logger.info("Server capabilities:");
+    logger.info(`  ✓ Tools: ${status.capabilities.tools ? 'enabled' : 'disabled'} (${Object.keys(status.capabilities).filter(k => status.capabilities[k as keyof typeof status.capabilities]).length} features)`);
+    logger.info(`  ✓ Resources: ${status.capabilities.resources ? 'enabled' : 'disabled'}`);
+    logger.info(`  ✓ Prompts: ${status.capabilities.prompts ? 'enabled' : 'disabled'}`);
+    logger.info(`  ✓ Elicitations: ${status.capabilities.elicitations ? 'enabled' : 'disabled'}`);
+    logger.info(`  ✓ Sampling: ${status.capabilities.sampling ? 'enabled' : 'disabled'}`);
+    
+    // Get transport info and provide connection instructions
+    const configManager = serverFactory.getConfigManager();
+    const transportConfig = configManager.getTransportConfig();
+    
+    if (transportConfig.type === 'http') {
+      logger.info("");
+      logger.info("🚀 HTTP Server Ready!");
+      logger.info(`📡 Test with MCP Inspector: npm run inspector:http`);
+      logger.info(`🔧 API Documentation: http://localhost:${transportConfig.port}/info`);
+      logger.info(`❤️ Health Check: http://localhost:${transportConfig.port}/health`);
+    } else {
+      logger.info("");
+      logger.info("🚀 Stdio Server Ready!");
+      logger.info("📡 Test with MCP Inspector: npm run inspector:cli");
+      logger.info("🔧 Connect with Claude Desktop or other MCP clients");
+    }
+
+    logger.info("");
+    logger.info("Server ready to handle requests...");
+    
+    // Keep the process running
+    process.stdin.resume();
+
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);
   }
 }
 
-// Handle graceful shutdown
-const handleShutdown = (signal: string) => {
-  logger.info(`Received ${signal}, shutting down gracefully...`);
-  process.exit(0);
-};
+/**
+ * Display help information
+ */
+function displayHelp(): void {
+  console.log(`
+{{PROJECT_NAME}} - Modern Model Context Protocol Server
 
-process.on('SIGINT', () => handleShutdown('SIGINT'));
-process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+USAGE:
+  npm run dev:stdio          # Start with stdio transport  
+  npm run dev:http           # Start with HTTP transport
+  npm run dev:http:oauth     # Start with OAuth enabled
+  npm run dev:http:stateless # Start in stateless mode
 
-// Handle uncaught exceptions
+TESTING:
+  npm run inspector         # Launch MCP Inspector (UI)
+  npm run inspector:cli     # Test via command line
+  npm run test:tools        # List available tools
+  npm run test:resources    # List available resources
+  npm run test:prompts      # List available prompts
+
+TRANSPORT OPTIONS:
+  stdio                     # Standard input/output (default)
+  http                      # HTTP server on port 3000
+
+HTTP OPTIONS:
+  --oauth                   # Enable OAuth authentication
+  --no-dns-protection       # Disable DNS rebinding protection  
+  --stateless               # Enable stateless mode
+  --port=3000               # Custom port (default: 3000)
+  --log-level=info          # Log level (debug|info|warn|error)
+
+FEATURES:
+  ✓ 2 comprehensive tools (data-analysis, server-status)
+  ✓ Rich resources with documentation and templates
+  ✓ Multi-methodology research prompts
+  ✓ Interactive elicitation and AI sampling
+  ✓ MCP Inspector integration for testing
+
+Learn more: https://github.com/LinuxDevil/Create-MCP
+`);
+}
+
+/**
+ * Graceful shutdown handling
+ */
+function setupGracefulShutdown(): void {
+  const shutdown = async (signal: string) => {
+    logger.info(`Received ${signal}, shutting down gracefully...`);
+    process.exit(0);
+  };
+
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught exception:', error);
   process.exit(1);
@@ -451,13 +150,23 @@ process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled rejection at:', promise, 'reason:', reason);
   process.exit(1);
 });
+}
 
-// Start the server if this file is run directly
-if (require.main === module) {
+// Setup graceful shutdown
+setupGracefulShutdown();
+
+// Check if this module is being run directly (ES module equivalent of require.main === module)
+// For ES modules, we check if the current file matches the entry point
+const isMainModule = process.argv[1] && (
+  import.meta.url === `file://${process.argv[1]}` ||
+  import.meta.url.endsWith(process.argv[1]) ||
+  process.argv[1].includes('server.ts') ||
+  process.argv[1].includes('server.js')
+);
+
+if (isMainModule || !process.argv[1]) {
   main().catch((error) => {
-    logger.error('Unhandled error:', error);
+    logger.error('Server startup failed:', error);
     process.exit(1);
   });
 }
-
-export { {{PROJECT_NAME}}Server };

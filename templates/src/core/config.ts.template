@@ -1,0 +1,147 @@
+/**
+ * Configuration management for {{PROJECT_NAME}}
+ * Centralized configuration with environment variable support
+ */
+
+export interface ServerConfig {
+  enableOAuth?: boolean;
+  enableDnsProtection?: boolean;
+  allowedHosts?: string[];
+  allowedOrigins?: string[];
+  stateless?: boolean;
+  port?: number;
+  logLevel?: 'debug' | 'info' | 'warn' | 'error';
+  enableElicitations?: boolean;
+  enableSampling?: boolean;
+  maxSamplingSize?: number;
+}
+
+export interface TransportConfig {
+  type: 'stdio' | 'http';
+  port: number;
+  enableCors: boolean;
+  enableCompression: boolean;
+}
+
+export interface ElicitationConfig {
+  maxIterations: number;
+  timeout: number;
+  enableInteractiveMode: boolean;
+  defaultStrategy: 'guided' | 'exploratory' | 'targeted';
+}
+
+export interface SamplingConfig {
+  maxSampleSize: number;
+  enableAISampling: boolean;
+  samplingStrategies: string[];
+  cacheResults: boolean;
+  enableDistributedSampling: boolean;
+}
+
+export class ConfigManager {
+  private static instance: ConfigManager;
+  private config!: ServerConfig;
+  private transportConfig!: TransportConfig;
+  private elicitationConfig!: ElicitationConfig;
+  private samplingConfig!: SamplingConfig;
+
+  private constructor() {
+    this.loadConfiguration();
+  }
+
+  public static getInstance(): ConfigManager {
+    if (!ConfigManager.instance) {
+      ConfigManager.instance = new ConfigManager();
+    }
+    return ConfigManager.instance;
+  }
+
+  private loadConfiguration(): void {
+    // Load from environment variables with defaults
+    this.config = {
+      enableOAuth: process.env.ENABLE_OAUTH === 'true',
+      enableDnsProtection: process.env.ENABLE_DNS_PROTECTION !== 'false',
+      allowedHosts: process.env.ALLOWED_HOSTS?.split(',') || ['127.0.0.1', 'localhost'],
+      allowedOrigins: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:*', 'https://localhost:*'],
+      stateless: process.env.STATELESS === 'true',
+      port: parseInt(process.env.PORT || '3000', 10),
+      logLevel: (process.env.LOG_LEVEL as any) || 'info',
+      enableElicitations: process.env.ENABLE_ELICITATIONS !== 'false',
+      enableSampling: process.env.ENABLE_SAMPLING !== 'false',
+      maxSamplingSize: parseInt(process.env.MAX_SAMPLING_SIZE || '1000', 10)
+    };
+
+    this.transportConfig = {
+      type: (process.env.MCP_TRANSPORT as any) || 'stdio',
+      port: this.config.port || 3000,
+      enableCors: process.env.ENABLE_CORS !== 'false',
+      enableCompression: process.env.ENABLE_COMPRESSION === 'true'
+    };
+
+    this.elicitationConfig = {
+      maxIterations: parseInt(process.env.ELICITATION_MAX_ITERATIONS || '10', 10),
+      timeout: parseInt(process.env.ELICITATION_TIMEOUT || '30000', 10),
+      enableInteractiveMode: process.env.ELICITATION_INTERACTIVE !== 'false',
+      defaultStrategy: (process.env.ELICITATION_STRATEGY as any) || 'guided'
+    };
+
+    this.samplingConfig = {
+      maxSampleSize: parseInt(process.env.SAMPLING_MAX_SIZE || '1000', 10),
+      enableAISampling: process.env.ENABLE_AI_SAMPLING === 'true',
+      samplingStrategies: process.env.SAMPLING_STRATEGIES?.split(',') || ['random', 'stratified', 'systematic'],
+      cacheResults: process.env.CACHE_SAMPLING_RESULTS !== 'false',
+      enableDistributedSampling: process.env.ENABLE_DISTRIBUTED_SAMPLING === 'true'
+    };
+  }
+
+  public getServerConfig(): ServerConfig {
+    return { ...this.config };
+  }
+
+  public getTransportConfig(): TransportConfig {
+    return { ...this.transportConfig };
+  }
+
+  public getElicitationConfig(): ElicitationConfig {
+    return { ...this.elicitationConfig };
+  }
+
+  public getSamplingConfig(): SamplingConfig {
+    return { ...this.samplingConfig };
+  }
+
+  public updateConfig(updates: Partial<ServerConfig>): void {
+    this.config = { ...this.config, ...updates };
+  }
+
+  public setTransportType(type: 'stdio' | 'http'): void {
+    this.transportConfig.type = type;
+  }
+
+  public isFeatureEnabled(feature: 'oauth' | 'dns-protection' | 'elicitations' | 'sampling'): boolean {
+    switch (feature) {
+      case 'oauth':
+        return this.config.enableOAuth || false;
+      case 'dns-protection':
+        return this.config.enableDnsProtection || false;
+      case 'elicitations':
+        return this.config.enableElicitations || false;
+      case 'sampling':
+        return this.config.enableSampling || false;
+      default:
+        return false;
+    }
+  }
+
+  public getEnvironmentInfo(): Record<string, any> {
+    return {
+      nodeVersion: process.version,
+      platform: process.platform,
+      arch: process.arch,
+      pid: process.pid,
+      uptime: process.uptime(),
+      memoryUsage: process.memoryUsage(),
+      env: process.env.NODE_ENV || 'development'
+    };
+  }
+}

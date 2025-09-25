@@ -1,0 +1,132 @@
+/**
+ * Prompt Registry for {{PROJECT_NAME}}
+ * Centralized registration and management of all MCP prompts
+ */
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { logger } from "../utils/logger.js";
+import { ResearchAnalysisPrompt } from "./research-analysis-prompt.js";
+
+export interface PromptStats {
+  toolCalls: number;
+  resourceAccess: number;
+  promptExecutions: number;
+  elicitationSessions: number;
+  samplingOperations: number;
+}
+
+export interface BasePrompt {
+  name: string;
+  register(server: McpServer, stats: PromptStats): void;
+}
+
+export class PromptRegistry {
+  private server: McpServer;
+  private stats: PromptStats;
+  private prompts: Map<string, BasePrompt> = new Map();
+
+  constructor(server: McpServer, stats: PromptStats) {
+    this.server = server;
+    this.stats = stats;
+    this.initializePrompts();
+  }
+
+  /**
+   * Initialize all available prompts
+   */
+  private initializePrompts(): void {
+    // Comprehensive Research Analysis Prompt - demonstrates all capabilities
+    this.prompts.set('research-analysis', new ResearchAnalysisPrompt());
+
+    logger.debug(`Initialized ${this.prompts.size} prompts`);
+  }
+
+  /**
+   * Register all prompts with the MCP server
+   */
+  public registerAllPrompts(): void {
+    logger.debug("Registering prompts with MCP server...");
+
+    let registeredCount = 0;
+    for (const [name, prompt] of this.prompts) {
+      try {
+        prompt.register(this.server, this.stats);
+        registeredCount++;
+        logger.debug(`Registered prompt: ${name}`);
+      } catch (error) {
+        logger.error(`Failed to register prompt ${name}:`, error);
+      }
+    }
+
+    logger.info(`Successfully registered ${registeredCount}/${this.prompts.size} prompts`);
+  }
+
+  /**
+   * Register a specific prompt
+   */
+  public registerPrompt(name: string): boolean {
+    const prompt = this.prompts.get(name);
+    if (!prompt) {
+      logger.error(`Prompt not found: ${name}`);
+      return false;
+    }
+
+    try {
+      prompt.register(this.server, this.stats);
+      logger.info(`Prompt registered: ${name}`);
+      return true;
+    } catch (error) {
+      logger.error(`Failed to register prompt ${name}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Add a new prompt to the registry
+   */
+  public addPrompt(name: string, prompt: BasePrompt): void {
+    if (this.prompts.has(name)) {
+      logger.warn(`Prompt ${name} already exists, overwriting`);
+    }
+
+    this.prompts.set(name, prompt);
+    logger.debug(`Added prompt to registry: ${name}`);
+  }
+
+  /**
+   * Remove a prompt from the registry
+   */
+  public removePrompt(name: string): boolean {
+    const removed = this.prompts.delete(name);
+    if (removed) {
+      logger.debug(`Removed prompt from registry: ${name}`);
+    } else {
+      logger.warn(`Prompt not found in registry: ${name}`);
+    }
+    return removed;
+  }
+
+  /**
+   * Get list of available prompts
+   */
+  public getAvailablePrompts(): string[] {
+    return Array.from(this.prompts.keys());
+  }
+
+  /**
+   * Get prompt information
+   */
+  public getPromptInfo(): Array<{ name: string; registered: boolean }> {
+    return Array.from(this.prompts.keys()).map(name => ({
+      name,
+      registered: true // In this implementation, prompts are registered when added
+    }));
+  }
+
+  /**
+   * Get prompt statistics
+   */
+  public getPromptStats(): PromptStats {
+    return { ...this.stats };
+  }
+}

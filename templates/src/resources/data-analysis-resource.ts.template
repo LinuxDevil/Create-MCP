@@ -1,0 +1,694 @@
+/**
+ * Data Analysis Resource for {{PROJECT_NAME}}
+ * Comprehensive resource demonstrating all MCP resource capabilities:
+ * - Multiple resource endpoints
+ * - Template-based dynamic resources
+ * - Integration with analysis workflows
+ * - Documentation and best practices
+ */
+
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { logger } from "../utils/logger.js";
+import { ConfigManager } from "../core/config.js";
+import { HealthChecker } from "../utils/health.js";
+import { BaseResource, ResourceStats } from "./index.js";
+
+export class DataAnalysisResource implements BaseResource {
+  public readonly name = "data-analysis";
+
+  public register(
+    server: McpServer, 
+    stats: ResourceStats, 
+    healthChecker?: HealthChecker,
+    configManager?: ConfigManager
+  ): void {
+    // Main data analysis methodology resource
+    server.registerResource(
+      this.name,
+      "analysis://methodology",
+      {
+        title: "Data Analysis Methodology",
+        description: "Comprehensive guide to data analysis approaches, techniques, and best practices",
+        mimeType: "application/json"
+      },
+      async () => {
+        logger.debug("Data analysis methodology accessed");
+        stats.resourceAccess++;
+
+        try {
+          const methodology = this.generateMethodologyGuide(configManager);
+          
+          return {
+            contents: [{
+              uri: "analysis://methodology",
+              text: JSON.stringify(methodology, null, 2),
+              mimeType: "application/json"
+            }]
+          };
+
+        } catch (error) {
+          logger.error("Error generating methodology guide:", error);
+          return {
+            contents: [{
+              uri: "analysis://methodology",
+              text: JSON.stringify({
+                error: "Failed to generate methodology guide",
+                message: error instanceof Error ? error.message : "Unknown error"
+              }, null, 2),
+              mimeType: "application/json"
+            }]
+          };
+        }
+      }
+    );
+
+    // Dynamic analysis templates using ResourceTemplate
+    server.registerResource(
+      "analysis-template",
+      new ResourceTemplate("analysis://template/{type}", { list: undefined }),
+      {
+        title: "Analysis Templates",
+        description: "Dynamic analysis templates for different analysis types",
+        mimeType: "application/json"
+      },
+      async (uri, { type }) => {
+        stats.resourceAccess++;
+        const typeStr = Array.isArray(type) ? type[0] : type;
+        const template = this.generateAnalysisTemplate(typeStr);
+        return {
+          contents: [{
+            uri: uri.href,
+            text: JSON.stringify(template, null, 2),
+            mimeType: "application/json"
+          }]
+        };
+      }
+    );
+
+    // Sampling strategies documentation
+    server.registerResource(
+      "sampling-guide",
+      "analysis://sampling-guide",
+      {
+        title: "Sampling Strategies Guide",
+        description: "Comprehensive guide to data sampling techniques and when to use them",
+        mimeType: "text/markdown"
+      },
+      async () => {
+        stats.resourceAccess++;
+        const guide = this.generateSamplingGuide();
+        return {
+          contents: [{
+            uri: "analysis://sampling-guide",
+            text: guide,
+            mimeType: "text/markdown"
+          }]
+        };
+      }
+    );
+
+    // Elicitation workflows
+    server.registerResource(
+      "elicitation-workflows",
+      "analysis://elicitation-workflows",
+      {
+        title: "Elicitation Workflows",
+        description: "Interactive elicitation workflows for guided data analysis",
+        mimeType: "application/json"
+      },
+      async () => {
+        stats.resourceAccess++;
+        const workflows = this.generateElicitationWorkflows();
+        return {
+          contents: [{
+            uri: "analysis://elicitation-workflows",
+            text: JSON.stringify(workflows, null, 2),
+            mimeType: "application/json"
+          }]
+        };
+      }
+    );
+
+    // Best practices resource
+    server.registerResource(
+      "analysis-best-practices",
+      "analysis://best-practices",
+      {
+        title: "Data Analysis Best Practices",
+        description: "Industry best practices for effective data analysis",
+        mimeType: "text/markdown"
+      },
+      async () => {
+        stats.resourceAccess++;
+        const bestPractices = this.generateBestPractices();
+        return {
+          contents: [{
+            uri: "analysis://best-practices",
+            text: bestPractices,
+            mimeType: "text/markdown"
+          }]
+        };
+      }
+    );
+
+    logger.debug("Data Analysis resource registered successfully");
+  }
+
+  /**
+   * Generate comprehensive methodology guide
+   */
+  private generateMethodologyGuide(configManager?: ConfigManager): any {
+    const methodology = {
+      title: "{{PROJECT_NAME}} Data Analysis Methodology",
+      version: "1.0.0",
+      timestamp: new Date().toISOString(),
+      
+      analysis_types: {
+        exploratory: {
+          description: "Initial investigation to discover patterns and insights",
+          when_to_use: "Beginning of analysis process, unknown data characteristics",
+          techniques: ["Data profiling", "Visualization", "Summary statistics", "Pattern identification"],
+          outputs: ["Data quality assessment", "Initial insights", "Analysis roadmap"]
+        },
+        
+        descriptive: {
+          description: "Summarize and describe data characteristics",
+          when_to_use: "Understanding current state, reporting, baseline establishment",
+          techniques: ["Statistical summaries", "Distribution analysis", "Correlation analysis"],
+          outputs: ["Statistical reports", "Data summaries", "Performance metrics"]
+        },
+        
+        diagnostic: {
+          description: "Investigate causes and relationships",
+          when_to_use: "Understanding why events occurred, root cause analysis",
+          techniques: ["Causal analysis", "Hypothesis testing", "Regression analysis"],
+          outputs: ["Causal insights", "Risk factors", "Relationship models"]
+        },
+        
+        predictive: {
+          description: "Forecast future trends and outcomes",
+          when_to_use: "Planning, forecasting, risk assessment",
+          techniques: ["Time series analysis", "Machine learning", "Statistical modeling"],
+          outputs: ["Forecasts", "Prediction models", "Risk assessments"]
+        },
+        
+        prescriptive: {
+          description: "Recommend actions and optimizations",
+          when_to_use: "Decision support, optimization, strategy development",
+          techniques: ["Optimization models", "Decision trees", "Simulation"],
+          outputs: ["Recommendations", "Action plans", "Optimization strategies"]
+        }
+      },
+
+      workflow: {
+        phases: [
+          {
+            phase: "Data Preparation",
+            steps: ["Data collection", "Quality assessment", "Cleaning", "Sampling"],
+            tools: ["data-analysis tool with sampling", "Quality checks"]
+          },
+          {
+            phase: "Exploratory Analysis", 
+            steps: ["Initial exploration", "Pattern identification", "Hypothesis generation"],
+            tools: ["data-analysis tool with exploratory type", "Visualization"]
+          },
+          {
+            phase: "Detailed Analysis",
+            steps: ["Statistical analysis", "Model building", "Validation"],
+            tools: ["data-analysis tool with specific types", "Statistical methods"]
+          },
+          {
+            phase: "Insights & Recommendations",
+            steps: ["Interpretation", "Recommendation generation", "Action planning"],
+            tools: ["prescriptive analysis", "Elicitation sessions"]
+          }
+        ]
+      },
+
+      integration_features: this.getIntegrationFeatures(configManager)
+    };
+
+    return methodology;
+  }
+
+  /**
+   * Get available integration features
+   */
+  private getIntegrationFeatures(configManager?: ConfigManager): any {
+    const features = {
+      sampling: {
+        available: true,
+        strategies: ["random", "systematic", "stratified", "ai-representative", "ai-diverse"],
+        description: "Intelligent sampling for large datasets"
+      },
+      elicitation: {
+        available: configManager?.isFeatureEnabled('elicitations') ?? true,
+        modes: ["guided", "exploratory", "targeted"],
+        description: "Interactive analysis guidance and question generation"
+      },
+      multi_format_support: {
+        available: true,
+        formats: ["JSON objects", "CSV-like data", "Mixed data types"],
+        description: "Handle various data formats and structures"
+      },
+      statistical_analysis: {
+        available: true,
+        methods: ["Descriptive statistics", "Distribution analysis", "Anomaly detection"],
+        description: "Built-in statistical computation capabilities"
+      }
+    };
+
+    if (configManager) {
+      (features as any).ai_sampling = {
+        available: configManager.isFeatureEnabled('sampling'),
+        description: "AI-powered intelligent sampling techniques"
+      };
+    }
+
+    return features;
+  }
+
+  /**
+   * Generate analysis template for specific type
+   */
+  private generateAnalysisTemplate(type: string): any {
+    const templates = {
+      exploratory: {
+        description: "Template for exploratory data analysis",
+        parameters: {
+          data: "Array of objects representing your dataset",
+          analysis_type: "exploratory",
+          target_fields: "Optional: specific fields to focus on",
+          sampling_strategy: "Recommended: 'ai-representative' for large datasets",
+          enable_elicitation: true
+        },
+        expected_outputs: ["Data profile", "Field statistics", "Pattern identification", "Quality assessment"],
+        next_steps: ["Review patterns", "Identify interesting fields", "Plan detailed analysis"]
+      },
+
+      descriptive: {
+        description: "Template for descriptive statistical analysis",
+        parameters: {
+          data: "Array of objects with numeric fields",
+          analysis_type: "descriptive", 
+          target_fields: "Numeric fields for statistical analysis",
+          confidence_level: 0.95,
+          output_format: "statistical"
+        },
+        expected_outputs: ["Statistical summaries", "Distribution analysis", "Correlation insights"],
+        next_steps: ["Validate statistics", "Identify significant patterns", "Compare with expectations"]
+      },
+
+      diagnostic: {
+        description: "Template for diagnostic/causal analysis",
+        parameters: {
+          data: "Dataset with potential causal relationships",
+          analysis_type: "diagnostic",
+          target_fields: "Fields suspected to have relationships",
+          enable_elicitation: true
+        },
+        expected_outputs: ["Relationship analysis", "Anomaly detection", "Causal insights"],
+        next_steps: ["Investigate anomalies", "Test hypotheses", "Validate relationships"]
+      },
+
+      predictive: {
+        description: "Template for predictive analysis",
+        parameters: {
+          data: "Historical data with time-based or sequential patterns",
+          analysis_type: "predictive",
+          target_fields: "Fields to predict or analyze trends for",
+          sampling_strategy: "systematic"
+        },
+        expected_outputs: ["Trend identification", "Forecast capabilities", "Risk assessment"],
+        next_steps: ["Validate trends", "Build prediction models", "Assess accuracy"]
+      },
+
+      prescriptive: {
+        description: "Template for prescriptive/recommendation analysis",
+        parameters: {
+          data: "Complete dataset with business context",
+          analysis_type: "prescriptive",
+          enable_elicitation: true,
+          output_format: "insights"
+        },
+        expected_outputs: ["Actionable recommendations", "Optimization suggestions", "Implementation plan"],
+        next_steps: ["Review recommendations", "Assess feasibility", "Create implementation plan"]
+      }
+    };
+
+    return templates[type as keyof typeof templates] || {
+      error: `Unknown analysis type: ${type}`,
+      available_types: Object.keys(templates)
+    };
+  }
+
+  /**
+   * Generate sampling strategies guide
+   */
+  private generateSamplingGuide(): string {
+    return `# Data Sampling Strategies Guide
+
+## Overview
+Sampling is crucial for analyzing large datasets efficiently while maintaining statistical validity.
+
+## Available Strategies
+
+### Traditional Sampling Methods
+
+#### Random Sampling
+- **Description**: Each record has equal probability of selection
+- **Use Case**: General purpose, unbiased sampling
+- **Pros**: Simple, unbiased, statistically sound
+- **Cons**: May not represent all subgroups
+- **Example**: \`sampling_strategy: "random", sample_size: 100\`
+
+#### Systematic Sampling
+- **Description**: Select every nth record after random start
+- **Use Case**: Ordered data, when patterns are evenly distributed
+- **Pros**: Even distribution across dataset
+- **Cons**: May miss periodic patterns
+- **Example**: \`sampling_strategy: "systematic", sample_size: 100\`
+
+#### Stratified Sampling
+- **Description**: Sample proportionally from each subgroup
+- **Use Case**: When distinct subgroups exist in data
+- **Pros**: Ensures representation of all groups
+- **Cons**: Requires knowledge of grouping field
+- **Example**: \`sampling_strategy: "stratified", target_fields: ["category"]\`
+
+### AI-Enhanced Sampling Methods
+
+#### AI Representative Sampling
+- **Description**: AI-optimized for statistical representativeness
+- **Use Case**: When sample must reflect population characteristics
+- **Pros**: Optimized representativeness, intelligent selection
+- **Cons**: More computationally intensive
+- **Example**: \`sampling_strategy: "ai-representative", sample_size: 200\`
+
+#### AI Diverse Sampling
+- **Description**: Maximize diversity and variety in sample
+- **Use Case**: Exploring edge cases, ensuring variety
+- **Pros**: Captures maximum data variety
+- **Cons**: May not be representative of typical cases
+- **Example**: \`sampling_strategy: "ai-diverse", target_fields: ["field1", "field2"]\`
+
+## Selection Guidelines
+
+### Small Datasets (< 100 records)
+- Use full dataset (sampling_strategy: "none")
+- Focus on data quality and completeness
+
+### Medium Datasets (100-1000 records)
+- Consider systematic or random sampling
+- Sample size: 50-70% of original
+
+### Large Datasets (> 1000 records)
+- Use AI-enhanced methods for better results
+- Sample size: 100-500 records depending on complexity
+- Consider stratified sampling for known categories
+
+## Best Practices
+
+1. **Match Strategy to Purpose**
+   - Exploratory: AI-diverse for maximum insight
+   - Statistical: AI-representative for accuracy
+   - Diagnostic: Stratified by suspected causal factors
+
+2. **Sample Size Guidelines**
+   - Minimum: 30 records for basic statistics
+   - Recommended: 100+ records for robust analysis
+   - Maximum: 1000 records (diminishing returns beyond)
+
+3. **Validation**
+   - Compare sample statistics to population when possible
+   - Use multiple sampling strategies for comparison
+   - Document sampling methodology
+
+## Integration with Analysis
+
+### Example Workflow
+\`\`\`json
+{
+  "data": [...],
+  "analysis_type": "exploratory",
+  "sampling_strategy": "ai-representative",
+  "sample_size": 200,
+  "target_fields": ["numeric_field1", "numeric_field2"],
+  "enable_elicitation": true
+}
+\`\`\`
+
+This approach combines intelligent sampling with interactive analysis for optimal results.
+`;
+  }
+
+  /**
+   * Generate elicitation workflows
+   */
+  private generateElicitationWorkflows(): any {
+    return {
+      title: "Interactive Elicitation Workflows",
+      description: "Structured approaches for interactive data analysis",
+      
+      workflows: {
+        data_exploration: {
+          name: "Data Exploration Workflow",
+          description: "Interactive exploration of unknown datasets",
+          steps: [
+            {
+              step: 1,
+              action: "Initial Analysis",
+              tool_call: {
+                tool: "data-analysis",
+                parameters: {
+                  analysis_type: "exploratory",
+                  enable_elicitation: true,
+                  output_format: "summary"
+                }
+              },
+              expected_output: "Overview and elicitation questions"
+            },
+            {
+              step: 2,
+              action: "Start Elicitation Session",
+              tool_call: {
+                tool: "start-elicitation",
+                parameters: {
+                  topic: "data exploration",
+                  strategy: "exploratory"
+                }
+              },
+              expected_output: "Session ID and first question"
+            },
+            {
+              step: 3,
+              action: "Interactive Exploration",
+              description: "Use continue-elicitation to answer questions and dive deeper",
+              iterations: "3-5 questions typically sufficient"
+            },
+            {
+              step: 4,
+              action: "Focused Analysis",
+              description: "Run targeted analysis based on elicitation insights"
+            }
+          ]
+        },
+
+        hypothesis_testing: {
+          name: "Hypothesis Testing Workflow", 
+          description: "Guided hypothesis validation process",
+          steps: [
+            {
+              step: 1,
+              action: "Diagnostic Analysis",
+              tool_call: {
+                tool: "data-analysis",
+                parameters: {
+                  analysis_type: "diagnostic",
+                  enable_elicitation: true
+                }
+              }
+            },
+            {
+              step: 2,
+              action: "Hypothesis Elicitation",
+              tool_call: {
+                tool: "start-elicitation",
+                parameters: {
+                  topic: "hypothesis validation",
+                  strategy: "targeted"
+                }
+              }
+            },
+            {
+              step: 3,
+              action: "Statistical Testing",
+              description: "Apply appropriate statistical tests based on elicited hypotheses"
+            }
+          ]
+        },
+
+        optimization_planning: {
+          name: "Optimization Planning Workflow",
+          description: "Develop actionable optimization strategies",
+          steps: [
+            {
+              step: 1,
+              action: "Prescriptive Analysis",
+              tool_call: {
+                tool: "data-analysis",
+                parameters: {
+                  analysis_type: "prescriptive",
+                  enable_elicitation: true,
+                  output_format: "insights"
+                }
+              }
+            },
+            {
+              step: 2,
+              action: "Strategy Elicitation",
+              tool_call: {
+                tool: "start-elicitation",
+                parameters: {
+                  topic: "optimization strategy",
+                  strategy: "guided"
+                }
+              }
+            },
+            {
+              step: 3,
+              action: "Implementation Planning",
+              description: "Develop detailed implementation plan based on insights"
+            }
+          ]
+        }
+      },
+
+      tips: [
+        "Start with exploratory analysis to understand your data",
+        "Use elicitation to guide analysis direction based on your domain knowledge",
+        "Combine different analysis types for comprehensive insights",
+        "Sampling can speed up analysis while maintaining quality"
+      ]
+    };
+  }
+
+  /**
+   * Generate best practices guide
+   */
+  private generateBestPractices(): string {
+    return `# Data Analysis Best Practices for {{PROJECT_NAME}}
+
+## Data Preparation
+
+### 1. Data Quality Assessment
+- Always start with exploratory analysis to understand data quality
+- Check for missing values, outliers, and inconsistencies
+- Validate data types and formats
+- Document any quality issues found
+
+### 2. Sampling Strategy
+- Use appropriate sampling for large datasets (>1000 records)
+- Choose AI-enhanced sampling for complex datasets
+- Document sampling methodology and validate representativeness
+- Consider multiple sampling approaches for comparison
+
+## Analysis Workflow
+
+### 3. Progressive Analysis Approach
+1. **Exploratory** → Understand data characteristics
+2. **Descriptive** → Quantify patterns and relationships  
+3. **Diagnostic** → Investigate causes and anomalies
+4. **Predictive** → Forecast trends and outcomes
+5. **Prescriptive** → Generate actionable recommendations
+
+### 4. Interactive Elicitation
+- Enable elicitation for complex or unfamiliar datasets
+- Use domain expertise to guide analysis direction
+- Ask follow-up questions based on initial findings
+- Document insights gained through elicitation process
+
+## Statistical Rigor
+
+### 5. Confidence and Validation
+- Use appropriate confidence levels (typically 95%)
+- Validate findings with multiple analysis approaches
+- Check assumptions before applying statistical methods
+- Be transparent about limitations and uncertainty
+
+### 6. Result Interpretation
+- Focus on practical significance, not just statistical significance
+- Consider business context in interpretation
+- Validate findings with domain experts
+- Document methodology and assumptions
+
+## Technical Implementation
+
+### 7. Tool Usage Patterns
+\`\`\`json
+// Start with exploration
+{
+  "analysis_type": "exploratory",
+  "sampling_strategy": "ai-representative", 
+  "enable_elicitation": true
+}
+
+// Follow with targeted analysis
+{
+  "analysis_type": "descriptive",
+  "target_fields": ["identified_key_fields"],
+  "confidence_level": 0.95
+}
+\`\`\`
+
+### 8. Output Management
+- Use appropriate output formats for your audience
+- 'summary' for executives, 'detailed' for analysts
+- 'statistical' for technical validation
+- 'insights' for actionable recommendations
+
+## Quality Assurance
+
+### 9. Validation Checklist
+- [ ] Data quality assessed and documented
+- [ ] Appropriate sampling strategy selected
+- [ ] Analysis type matches business question
+- [ ] Results validated through multiple approaches
+- [ ] Limitations and assumptions documented
+- [ ] Recommendations are actionable and specific
+
+### 10. Documentation Standards
+- Document all analysis parameters and choices
+- Include data sources and collection methods
+- Record elicitation sessions and insights
+- Maintain analysis audit trail
+- Create reproducible analysis scripts
+
+## Common Pitfalls to Avoid
+
+- **Insufficient data exploration** → Always start with exploratory analysis
+- **Inappropriate sampling** → Match sampling strategy to data characteristics
+- **Analysis without context** → Use elicitation to incorporate domain knowledge
+- **Overgeneralization** → Be cautious about extending findings beyond your data
+- **Missing validation** → Always validate findings with multiple approaches
+
+## Advanced Techniques
+
+### Combining Multiple Analysis Types
+Run different analysis types on the same dataset to get comprehensive insights:
+1. Exploratory for patterns
+2. Diagnostic for relationships  
+3. Predictive for trends
+4. Prescriptive for actions
+
+### Iterative Refinement
+Use elicitation results to refine analysis:
+1. Initial broad analysis
+2. Elicitation to identify focus areas
+3. Targeted deep-dive analysis
+4. Validation and recommendation
+
+Remember: Good analysis combines statistical rigor with domain expertise and practical business insight.
+`;
+  }
+}

@@ -1,0 +1,271 @@
+/**
+ * Transport Manager for {{PROJECT_NAME}}
+ * Coordinates between different transport types and manages their lifecycle
+ */
+
+import { {{PROJECT_NAME_PASCAL}}McpServer } from "../core/mcp-server.js";
+import { ConfigManager, TransportConfig } from "../core/config.js";
+import { StdioTransportHandler } from "./stdio-transport.js";
+import { HttpTransportHandler } from "./http-transport.js";
+import { logger } from "../utils/logger.js";
+
+export type TransportType = 'stdio' | 'http';
+
+export interface TransportStatus {
+  type: TransportType;
+  active: boolean;
+  details: any;
+}
+
+export class TransportManager {
+  private server: {{PROJECT_NAME_PASCAL}}McpServer;
+  private configManager: ConfigManager;
+  private stdioHandler: StdioTransportHandler;
+  private httpHandler: HttpTransportHandler;
+  private activeTransport: TransportType | null = null;
+
+  constructor(server: {{PROJECT_NAME_PASCAL}}McpServer) {
+    this.server = server;
+    this.configManager = ConfigManager.getInstance();
+    this.stdioHandler = new StdioTransportHandler(server);
+    this.httpHandler = new HttpTransportHandler(server);
+  }
+
+  /**
+   * Start the stdio transport
+   */
+  public async startStdio(): Promise<void> {
+    if (this.activeTransport && this.activeTransport !== 'stdio') {
+      throw new Error(`Cannot start stdio transport: ${this.activeTransport} transport is already active`);
+    }
+
+    if (this.activeTransport === 'stdio' && this.stdioHandler.isRunning()) {
+      logger.warn("Stdio transport already running");
+      return;
+    }
+
+    try {
+      await this.stdioHandler.start();
+      this.activeTransport = 'stdio';
+      logger.info("Transport manager: Stdio transport started successfully");
+    } catch (error) {
+      logger.error("Transport manager: Failed to start stdio transport:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Start the HTTP transport
+   */
+  public async startHttp(port?: number): Promise<void> {
+    if (this.activeTransport && this.activeTransport !== 'http') {
+      throw new Error(`Cannot start HTTP transport: ${this.activeTransport} transport is already active`);
+    }
+
+    if (this.activeTransport === 'http' && this.httpHandler.isActive()) {
+      logger.warn("HTTP transport already running");
+      return;
+    }
+
+    const transportConfig = this.configManager.getTransportConfig();
+    const actualPort = port || transportConfig.port;
+
+    try {
+      await this.httpHandler.start(actualPort);
+      this.activeTransport = 'http';
+      logger.info("Transport manager: HTTP transport started successfully");
+    } catch (error) {
+      logger.error("Transport manager: Failed to start HTTP transport:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Start transport based on configuration
+   */
+  public async startConfiguredTransport(): Promise<void> {
+    const transportConfig = this.configManager.getTransportConfig();
+    
+    logger.info(`Starting configured transport: ${transportConfig.type}`);
+
+    switch (transportConfig.type) {
+      case 'stdio':
+        await this.startStdio();
+        break;
+      case 'http':
+        await this.startHttp(transportConfig.port);
+        break;
+      default:
+        throw new Error(`Unsupported transport type: ${transportConfig.type}`);
+    }
+  }
+
+  /**
+   * Stop the active transport
+   */
+  public async stopActiveTransport(): Promise<void> {
+    if (!this.activeTransport) {
+      logger.warn("No active transport to stop");
+      return;
+    }
+
+    logger.info(`Stopping active transport: ${this.activeTransport}`);
+
+    try {
+      switch (this.activeTransport) {
+        case 'stdio':
+          await this.stdioHandler.stop();
+          break;
+        case 'http':
+          await this.httpHandler.stop();
+          break;
+      }
+
+      this.activeTransport = null;
+      logger.info("Transport manager: Active transport stopped successfully");
+    } catch (error) {
+      logger.error("Transport manager: Failed to stop active transport:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Stop all transports
+   */
+  public async stopAllTransports(): Promise<void> {
+    logger.info("Stopping all transports...");
+
+    const promises: Promise<void>[] = [];
+
+    if (this.stdioHandler.isRunning()) {
+      promises.push(this.stdioHandler.stop());
+    }
+
+    if (this.httpHandler.isActive()) {
+      promises.push(this.httpHandler.stop());
+    }
+
+    try {
+      await Promise.all(promises);
+      this.activeTransport = null;
+      logger.info("Transport manager: All transports stopped successfully");
+    } catch (error) {
+      logger.error("Transport manager: Failed to stop all transports:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Switch to a different transport
+   */
+  public async switchTransport(newType: TransportType, port?: number): Promise<void> {
+    if (this.activeTransport === newType) {
+      logger.warn(`Transport ${newType} is already active`);
+      return;
+    }
+
+    logger.info(`Switching transport from ${this.activeTransport} to ${newType}`);
+
+    // Stop current transport
+    if (this.activeTransport) {
+      await this.stopActiveTransport();
+    }
+
+    // Start new transport
+    switch (newType) {
+      case 'stdio':
+        await this.startStdio();
+        break;
+      case 'http':
+        await this.startHttp(port);
+        break;
+      default:
+        throw new Error(`Unsupported transport type: ${newType}`);
+    }
+  }
+
+  /**
+   * Get the status of all transports
+   */
+  public getTransportStatus(): TransportStatus[] {
+    return [
+      {
+        type: 'stdio',
+        active: this.stdioHandler.isRunning(),
+        details: this.stdioHandler.getStatus()
+      },
+      {
+        type: 'http',
+        active: this.httpHandler.isActive(),
+        details: this.httpHandler.getStatus()
+      }
+    ];
+  }
+
+  /**
+   * Get the active transport type
+   */
+  public getActiveTransport(): TransportType | null {
+    return this.activeTransport;
+  }
+
+  /**
+   * Check if any transport is active
+   */
+  public hasActiveTransport(): boolean {
+    return this.activeTransport !== null;
+  }
+
+  /**
+   * Get detailed status information
+   */
+  public async getDetailedStatus(): Promise<any> {
+    const transportConfig = this.configManager.getTransportConfig();
+    const serverStatus = await this.server.getStatus();
+
+    return {
+      configured: transportConfig.type,
+      active: this.activeTransport,
+      server: {
+        name: serverStatus.name,
+        version: serverStatus.version,
+        uptime: serverStatus.uptime
+      },
+      transports: this.getTransportStatus(),
+      capabilities: serverStatus.capabilities
+    };
+  }
+
+  /**
+   * Setup graceful shutdown handlers
+   */
+  public setupGracefulShutdown(): void {
+    const shutdown = async (signal: string) => {
+      logger.info(`Received ${signal}, shutting down transports...`);
+      
+      try {
+        await this.stopAllTransports();
+        await this.server.shutdown();
+        logger.info("Graceful shutdown completed");
+        process.exit(0);
+      } catch (error) {
+        logger.error("Error during graceful shutdown:", error);
+        process.exit(1);
+      }
+    };
+
+    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    
+    // Handle uncaught exceptions
+    process.on('uncaughtException', (error) => {
+      logger.error('Uncaught exception:', error);
+      shutdown('UNCAUGHT_EXCEPTION');
+    });
+
+    process.on('unhandledRejection', (reason, promise) => {
+      logger.error('Unhandled rejection at:', promise, 'reason:', reason);
+      shutdown('UNHANDLED_REJECTION');
+    });
+  }
+}

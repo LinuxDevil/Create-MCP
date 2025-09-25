@@ -1,0 +1,232 @@
+/**
+ * Server Factory for {{PROJECT_NAME}}
+ * Handles server instantiation and configuration based on environment and arguments
+ */
+
+import { {{PROJECT_NAME_PASCAL}}McpServer } from "./mcp-server.js";
+import { ConfigManager, ServerConfig } from "./config.js";
+import { TransportManager } from "../transports/transport-manager.js";
+import { logger } from "../utils/logger.js";
+
+export interface ServerFactoryOptions {
+  args?: string[];
+  env?: Record<string, string>;
+  configOverrides?: Partial<ServerConfig>;
+}
+
+export class ServerFactory {
+  private static instance: ServerFactory;
+  private configManager: ConfigManager;
+
+  private constructor() {
+    this.configManager = ConfigManager.getInstance();
+  }
+
+  public static getInstance(): ServerFactory {
+    if (!ServerFactory.instance) {
+      ServerFactory.instance = new ServerFactory();
+    }
+    return ServerFactory.instance;
+  }
+
+  public getConfigManager(): ConfigManager {
+    return this.configManager;
+  }
+
+  /**
+   * Create and configure a new MCP server instance
+   */
+  public async createServer(options: ServerFactoryOptions = {}): Promise<{{PROJECT_NAME_PASCAL}}McpServer> {
+    const { args = [], configOverrides = {} } = options;
+
+    logger.info("Creating MCP server instance...");
+
+    // Parse command line arguments
+    const parsedConfig = this.parseArguments(args);
+    
+    // Apply configuration overrides
+    const finalConfig = {
+      ...parsedConfig,
+      ...configOverrides
+    };
+
+    // Update configuration
+    if (Object.keys(finalConfig).length > 0) {
+      this.configManager.updateConfig(finalConfig);
+    }
+
+    // Create server instance
+    const server = new {{PROJECT_NAME_PASCAL}}McpServer();
+
+    logger.info("MCP server instance created successfully");
+    return server;
+  }
+
+  /**
+   * Create and start a server with the specified transport
+   */
+  public async createAndStartServer(options: ServerFactoryOptions = {}): Promise<{{PROJECT_NAME_PASCAL}}McpServer> {
+    const server = await this.createServer(options);
+    const transportManager = new TransportManager(server);
+
+    // Determine transport type from arguments or environment
+    const transportConfig = this.configManager.getTransportConfig();
+    
+    logger.info(`Starting server with ${transportConfig.type} transport...`);
+
+    switch (transportConfig.type) {
+      case 'stdio':
+        await transportManager.startStdio();
+        break;
+      case 'http':
+        await transportManager.startHttp(transportConfig.port);
+        break;
+      default:
+        throw new Error(`Unsupported transport type: ${transportConfig.type}`);
+    }
+
+    return server;
+  }
+
+  /**
+   * Parse command line arguments into configuration
+   */
+  private parseArguments(args: string[]): Partial<ServerConfig> {
+    const config: Partial<ServerConfig> = {};
+
+    // Determine transport type from arguments
+    if (args.includes('stdio')) {
+      // Set stdio transport
+      this.configManager.setTransportType('stdio');
+      logger.debug("Transport set to stdio from command line");
+    } else if (args.includes('http')) {
+      // Set HTTP transport
+      this.configManager.setTransportType('http');
+      logger.debug("Transport set to http from command line");
+    } else if (args.length === 0) {
+      // Default to stdio if no transport specified
+      this.configManager.setTransportType('stdio');
+      logger.debug("No transport specified, defaulting to stdio");
+    }
+
+    // OAuth
+    if (args.includes('--oauth')) {
+      config.enableOAuth = true;
+    }
+
+    // DNS Protection
+    if (args.includes('--no-dns-protection')) {
+      config.enableDnsProtection = false;
+    }
+
+    // Stateless mode
+    if (args.includes('--stateless')) {
+      config.stateless = true;
+    }
+
+    // Port
+    const portArg = args.find(arg => arg.startsWith('--port='));
+    if (portArg) {
+      const port = parseInt(portArg.split('=')[1], 10);
+      if (!isNaN(port)) {
+        config.port = port;
+      }
+    }
+
+    // Log level
+    const logLevelArg = args.find(arg => arg.startsWith('--log-level='));
+    if (logLevelArg) {
+      const logLevel = logLevelArg.split('=')[1] as any;
+      if (['debug', 'info', 'warn', 'error'].includes(logLevel)) {
+        config.logLevel = logLevel;
+      }
+    }
+
+    // Features
+    if (args.includes('--enable-elicitations')) {
+      config.enableElicitations = true;
+    }
+
+    if (args.includes('--disable-elicitations')) {
+      config.enableElicitations = false;
+    }
+
+    if (args.includes('--enable-sampling')) {
+      config.enableSampling = true;
+    }
+
+    if (args.includes('--disable-sampling')) {
+      config.enableSampling = false;
+    }
+
+    // Max sampling size
+    const maxSamplingArg = args.find(arg => arg.startsWith('--max-sampling-size='));
+    if (maxSamplingArg) {
+      const maxSize = parseInt(maxSamplingArg.split('=')[1], 10);
+      if (!isNaN(maxSize) && maxSize > 0) {
+        config.maxSamplingSize = maxSize;
+      }
+    }
+
+    return config;
+  }
+
+  /**
+   * Get available command line options for help text
+   */
+  public getAvailableOptions(): string[] {
+    return [
+      'Transport Options:',
+      '  stdio                    Use standard input/output transport (default)',
+      '  http                     Use HTTP transport with streaming support',
+      '',
+      'Configuration Options:',
+      '  --oauth                  Enable OAuth authentication',
+      '  --no-dns-protection     Disable DNS rebinding protection',
+      '  --stateless             Enable stateless mode',
+      '  --port=<number>         Set HTTP port (default: 3000)',
+      '  --log-level=<level>     Set log level (debug|info|warn|error)',
+      '',
+      'Feature Options:',
+      '  --enable-elicitations   Enable elicitation features (default: true)',
+      '  --disable-elicitations  Disable elicitation features',
+      '  --enable-sampling       Enable sampling features (default: true)',
+      '  --disable-sampling      Disable sampling features',
+      '  --max-sampling-size=<n> Set maximum sampling size (default: 1000)',
+      '',
+      'Examples:',
+      '  npm run dev:stdio',
+      '  npm run dev:http',
+      '  npm run dev:http -- --port=4000 --oauth',
+      '  npm run dev:stdio -- --log-level=debug --disable-sampling'
+    ];
+  }
+
+  /**
+   * Validate server configuration
+   */
+  public validateConfiguration(): { valid: boolean; errors: string[] } {
+    const config = this.configManager.getServerConfig();
+    const errors: string[] = [];
+
+    // Validate port
+    if (config.port && (config.port < 1 || config.port > 65535)) {
+      errors.push('Port must be between 1 and 65535');
+    }
+
+    // Validate allowed hosts
+    if (config.allowedHosts && config.allowedHosts.length === 0) {
+      errors.push('At least one allowed host must be specified');
+    }
+
+    // Validate sampling size
+    if (config.maxSamplingSize && config.maxSamplingSize < 1) {
+      errors.push('Maximum sampling size must be greater than 0');
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+}

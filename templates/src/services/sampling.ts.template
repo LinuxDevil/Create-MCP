@@ -1,0 +1,816 @@
+/**
+ * Sampling Service for {{PROJECT_NAME}}
+ * Provides data sampling and generation capabilities
+ */
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+import { logger } from "../utils/logger.js";
+import { SamplingConfig } from "../core/config.js";
+
+export interface SamplingStats {
+  toolCalls: number;
+  resourceAccess: number;
+  promptExecutions: number;
+  elicitationSessions: number;
+  samplingOperations: number;
+}
+
+export interface SampleResult {
+  id: string;
+  strategy: string;
+  originalSize: number;
+  sampleSize: number;
+  data: any[];
+  metadata: {
+    timestamp: Date;
+    confidence: number;
+    bias: string[];
+    representativeness: number;
+  };
+}
+
+export class SamplingService {
+  private config: SamplingConfig;
+  private stats: SamplingStats;
+  private cache: Map<string, SampleResult> = new Map();
+
+  constructor(config: SamplingConfig, stats: SamplingStats) {
+    this.config = config;
+    this.stats = stats;
+  }
+
+  /**
+   * Register sampling tools with the MCP server
+   */
+  public registerTools(server: McpServer): void {
+    // Generate sample tool
+    server.registerTool(
+      "generate-sample",
+      {
+        title: "Generate Data Sample",
+        description: "Generate samples from datasets using various sampling strategies",
+        inputSchema: {
+          data: z.array(z.any()).describe("Source data to sample from"),
+          strategy: z.enum(['random', 'systematic', 'stratified', 'cluster', 'convenience', 'quota'])
+            .describe("Sampling strategy"),
+          sampleSize: z.number().min(1).describe("Desired sample size"),
+          stratifyBy: z.string().optional().describe("Field to stratify by (for stratified sampling)"),
+          clusterBy: z.string().optional().describe("Field to cluster by (for cluster sampling)"),
+          seed: z.number().optional().describe("Random seed for reproducibility")
+        }
+      },
+      async ({ data, strategy, sampleSize, stratifyBy, clusterBy, seed }) => {
+        this.stats.samplingOperations++;
+        
+        if (sampleSize > this.config.maxSampleSize) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                error: "Sample size exceeds maximum allowed",
+                maxAllowed: this.config.maxSampleSize,
+                requested: sampleSize
+              }, null, 2)
+            }],
+            isError: true
+          };
+        }
+
+        const result = this.generateSample(data, strategy, sampleSize, { stratifyBy, clusterBy, seed });
+        
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(result, null, 2)
+          }]
+        };
+      }
+    );
+
+    // AI-powered sampling tool
+    if (this.config.enableAISampling) {
+      server.registerTool(
+        "ai-smart-sample",
+        {
+          title: "AI-Powered Smart Sampling",
+          description: "Use AI techniques to create intelligent samples based on data characteristics",
+          inputSchema: {
+            data: z.array(z.any()).describe("Source data"),
+            objective: z.enum(['representative', 'diverse', 'edge-cases', 'balanced', 'informative'])
+              .describe("Sampling objective"),
+            sampleSize: z.number().min(1).describe("Desired sample size"),
+            features: z.array(z.string()).optional().describe("Key features to consider"),
+            constraints: z.record(z.any()).optional().describe("Sampling constraints")
+          }
+        },
+        async ({ data, objective, sampleSize, features, constraints }) => {
+          this.stats.samplingOperations++;
+          
+          const result = this.aiSmartSample(data, objective, sampleSize, features, constraints);
+          
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(result, null, 2)
+            }]
+          };
+        }
+      );
+    }
+
+    // Sample analysis tool
+    server.registerTool(
+      "analyze-sample",
+      {
+        title: "Analyze Sample Quality",
+        description: "Analyze the quality and representativeness of a sample",
+        inputSchema: {
+          originalData: z.array(z.any()).describe("Original dataset"),
+          sampleData: z.array(z.any()).describe("Sample to analyze"),
+          analysisType: z.enum(['basic', 'statistical', 'comprehensive']).optional()
+            .describe("Type of analysis to perform")
+        }
+      },
+      async ({ originalData, sampleData, analysisType = 'basic' }) => {
+        const analysis = this.analyzeSample(originalData, sampleData, analysisType);
+        
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(analysis, null, 2)
+          }]
+        };
+      }
+    );
+
+    // Generate synthetic data tool
+    server.registerTool(
+      "generate-synthetic-data",
+      {
+        title: "Generate Synthetic Data",
+        description: "Generate synthetic data based on patterns from source data",
+        inputSchema: {
+          sourceData: z.array(z.any()).describe("Source data to learn patterns from"),
+          count: z.number().min(1).max(10000).describe("Number of synthetic records to generate"),
+          preserveDistribution: z.boolean().optional().describe("Preserve statistical distribution"),
+          addNoise: z.number().min(0).max(1).optional().describe("Amount of noise to add (0-1)")
+        }
+      },
+      async ({ sourceData, count, preserveDistribution = true, addNoise = 0.1 }) => {
+        this.stats.samplingOperations++;
+        
+        if (count > this.config.maxSampleSize) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                error: "Count exceeds maximum allowed",
+                maxAllowed: this.config.maxSampleSize,
+                requested: count
+              }, null, 2)
+            }],
+            isError: true
+          };
+        }
+
+        const syntheticData = this.generateSyntheticData(sourceData, count, preserveDistribution, addNoise);
+        
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              original_count: sourceData.length,
+              synthetic_count: syntheticData.length,
+              data: syntheticData,
+              metadata: {
+                preserveDistribution,
+                addNoise,
+                timestamp: new Date().toISOString()
+              }
+            }, null, 2)
+          }]
+        };
+      }
+    );
+
+    logger.debug("Sampling tools registered successfully");
+  }
+
+  /**
+   * Register sampling resources with the MCP server
+   */
+  public registerResources(server: McpServer): void {
+    // Sampling strategies resource
+    server.registerResource(
+      "sampling-strategies",
+      "sampling://strategies",
+      {
+        title: "Available Sampling Strategies",
+        description: "Documentation of available sampling strategies and their use cases",
+        mimeType: "application/json"
+      },
+      async () => {
+        this.stats.resourceAccess++;
+        
+        return {
+          contents: [{
+            uri: "sampling://strategies",
+            text: JSON.stringify(this.getSamplingStrategiesInfo(), null, 2),
+            mimeType: "application/json"
+          }]
+        };
+      }
+    );
+
+    // Sampling best practices resource
+    server.registerResource(
+      "sampling-best-practices",
+      "sampling://best-practices",
+      {
+        title: "Sampling Best Practices",
+        description: "Guidelines and best practices for effective data sampling",
+        mimeType: "text/markdown"
+      },
+      async () => {
+        this.stats.resourceAccess++;
+        
+        return {
+          contents: [{
+            uri: "sampling://best-practices",
+            text: this.getSamplingBestPractices(),
+            mimeType: "text/markdown"
+          }]
+        };
+      }
+    );
+
+    logger.debug("Sampling resources registered successfully");
+  }
+
+  /**
+   * Generate sample using specified strategy
+   */
+  private generateSample(
+    data: any[], 
+    strategy: string, 
+    sampleSize: number, 
+    options: { stratifyBy?: string; clusterBy?: string; seed?: number }
+  ): SampleResult {
+    if (sampleSize >= data.length) {
+      return this.createSampleResult('complete', data, data, strategy);
+    }
+
+    // Set random seed if provided (simplified implementation)
+    if (options.seed !== undefined) {
+      // Simple seed-based random function replacement
+      let seed = options.seed;
+      const seedRandom = () => {
+        seed = (seed * 9301 + 49297) % 233280;
+        return seed / 233280;
+      };
+      Math.random = seedRandom;
+    }
+
+    let sample: any[];
+    
+    switch (strategy) {
+      case 'random':
+        sample = this.randomSample(data, sampleSize);
+        break;
+      case 'systematic':
+        sample = this.systematicSample(data, sampleSize);
+        break;
+      case 'stratified':
+        sample = this.stratifiedSample(data, sampleSize, options.stratifyBy);
+        break;
+      case 'cluster':
+        sample = this.clusterSample(data, sampleSize, options.clusterBy);
+        break;
+      case 'convenience':
+        sample = this.convenienceSample(data, sampleSize);
+        break;
+      case 'quota':
+        sample = this.quotaSample(data, sampleSize);
+        break;
+      default:
+        sample = this.randomSample(data, sampleSize);
+    }
+
+    const result = this.createSampleResult(strategy, data, sample, strategy);
+    
+    // Cache if enabled
+    if (this.config.cacheResults) {
+      this.cache.set(result.id, result);
+    }
+
+    return result;
+  }
+
+  /**
+   * Random sampling
+   */
+  private randomSample(data: any[], sampleSize: number): any[] {
+    const shuffled = [...data].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, sampleSize);
+  }
+
+  /**
+   * Systematic sampling
+   */
+  private systematicSample(data: any[], sampleSize: number): any[] {
+    const interval = Math.floor(data.length / sampleSize);
+    const start = Math.floor(Math.random() * interval);
+    const sample: any[] = [];
+
+    for (let i = start; i < data.length && sample.length < sampleSize; i += interval) {
+      sample.push(data[i]);
+    }
+
+    return sample;
+  }
+
+  /**
+   * Stratified sampling
+   */
+  private stratifiedSample(data: any[], sampleSize: number, stratifyBy?: string): any[] {
+    if (!stratifyBy) {
+      return this.randomSample(data, sampleSize);
+    }
+
+    const strata = this.groupBy(data, stratifyBy);
+    const strataKeys = Object.keys(strata);
+    const samplePerStratum = Math.floor(sampleSize / strataKeys.length);
+    const sample: any[] = [];
+
+    for (const key of strataKeys) {
+      const stratumSample = this.randomSample(strata[key], samplePerStratum);
+      sample.push(...stratumSample);
+    }
+
+    // Add remaining samples if needed
+    const remaining = sampleSize - sample.length;
+    if (remaining > 0) {
+      const allRemaining = data.filter(item => !sample.includes(item));
+      const additionalSample = this.randomSample(allRemaining, remaining);
+      sample.push(...additionalSample);
+    }
+
+    return sample.slice(0, sampleSize);
+  }
+
+  /**
+   * Cluster sampling
+   */
+  private clusterSample(data: any[], sampleSize: number, clusterBy?: string): any[] {
+    if (!clusterBy) {
+      return this.randomSample(data, sampleSize);
+    }
+
+    const clusters = this.groupBy(data, clusterBy);
+    const clusterKeys = Object.keys(clusters);
+    const selectedClusters = this.randomSample(clusterKeys, Math.min(3, clusterKeys.length));
+    
+    let sample: any[] = [];
+    for (const clusterKey of selectedClusters) {
+      sample.push(...clusters[clusterKey]);
+    }
+
+    return this.randomSample(sample, sampleSize);
+  }
+
+  /**
+   * Convenience sampling
+   */
+  private convenienceSample(data: any[], sampleSize: number): any[] {
+    return data.slice(0, sampleSize);
+  }
+
+  /**
+   * Quota sampling
+   */
+  private quotaSample(data: any[], sampleSize: number): any[] {
+    // Simple quota based on even distribution
+    return this.systematicSample(data, sampleSize);
+  }
+
+  /**
+   * AI-powered smart sampling
+   */
+  private aiSmartSample(
+    data: any[], 
+    objective: string, 
+    sampleSize: number, 
+    features?: string[], 
+    constraints?: any
+  ): SampleResult {
+    // This is a simplified AI sampling implementation
+    let sample: any[];
+
+    switch (objective) {
+      case 'representative':
+        sample = this.representativeSample(data, sampleSize, features);
+        break;
+      case 'diverse':
+        sample = this.diverseSample(data, sampleSize, features);
+        break;
+      case 'edge-cases':
+        sample = this.edgeCasesSample(data, sampleSize, features);
+        break;
+      case 'balanced':
+        sample = this.balancedSample(data, sampleSize, features);
+        break;
+      case 'informative':
+        sample = this.informativeSample(data, sampleSize, features);
+        break;
+      default:
+        sample = this.randomSample(data, sampleSize);
+    }
+
+    return this.createSampleResult(`ai-${objective}`, data, sample, objective);
+  }
+
+  /**
+   * Representative sampling using statistical measures
+   */
+  private representativeSample(data: any[], sampleSize: number, features?: string[]): any[] {
+    // Simplified: use stratified sampling on key features
+    if (features && features.length > 0) {
+      return this.stratifiedSample(data, sampleSize, features[0]);
+    }
+    return this.systematicSample(data, sampleSize);
+  }
+
+  /**
+   * Diverse sampling to maximize variety
+   */
+  private diverseSample(data: any[], sampleSize: number, features?: string[]): any[] {
+    // Simplified: maximize distance between selected items
+    const sample: any[] = [];
+    const remaining = [...data];
+
+    // Start with random item
+    if (remaining.length > 0) {
+      const firstIndex = Math.floor(Math.random() * remaining.length);
+      sample.push(remaining.splice(firstIndex, 1)[0]);
+    }
+
+    // Select items that are most different from already selected
+    while (sample.length < sampleSize && remaining.length > 0) {
+      let maxDiversityIndex = 0;
+      let maxDiversity = -1;
+
+      for (let i = 0; i < remaining.length; i++) {
+        const diversity = this.calculateDiversity(remaining[i], sample, features);
+        if (diversity > maxDiversity) {
+          maxDiversity = diversity;
+          maxDiversityIndex = i;
+        }
+      }
+
+      sample.push(remaining.splice(maxDiversityIndex, 1)[0]);
+    }
+
+    return sample;
+  }
+
+  /**
+   * Edge cases sampling
+   */
+  private edgeCasesSample(data: any[], sampleSize: number, features?: string[]): any[] {
+    // Find outliers and edge cases
+    const sorted = [...data].sort((a, b) => {
+      if (features && features.length > 0) {
+        const aVal = a[features[0]];
+        const bVal = b[features[0]];
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      }
+      return Math.random() - 0.5;
+    });
+
+    const edgeCases: any[] = [];
+    const edgeSize = Math.min(sampleSize, 10);
+    
+    // Take from both ends
+    edgeCases.push(...sorted.slice(0, Math.ceil(edgeSize / 2)));
+    edgeCases.push(...sorted.slice(-Math.floor(edgeSize / 2)));
+
+    // Fill remaining with random selection
+    const remaining = sampleSize - edgeCases.length;
+    if (remaining > 0) {
+      const middle = sorted.slice(Math.ceil(edgeSize / 2), sorted.length - Math.floor(edgeSize / 2));
+      edgeCases.push(...this.randomSample(middle, remaining));
+    }
+
+    return edgeCases.slice(0, sampleSize);
+  }
+
+  /**
+   * Balanced sampling
+   */
+  private balancedSample(data: any[], sampleSize: number, features?: string[]): any[] {
+    if (features && features.length > 0) {
+      return this.stratifiedSample(data, sampleSize, features[0]);
+    }
+    return this.systematicSample(data, sampleSize);
+  }
+
+  /**
+   * Informative sampling
+   */
+  private informativeSample(data: any[], sampleSize: number, features?: string[]): any[] {
+    // Select items with highest information content (simplified)
+    return this.diverseSample(data, sampleSize, features);
+  }
+
+  /**
+   * Calculate diversity metric between item and sample
+   */
+  private calculateDiversity(item: any, sample: any[], features?: string[]): number {
+    if (sample.length === 0) return 1;
+
+    let totalDifference = 0;
+    let comparisons = 0;
+
+    for (const sampleItem of sample) {
+      if (features) {
+        for (const feature of features) {
+          const diff = this.calculateFeatureDifference(item[feature], sampleItem[feature]);
+          totalDifference += diff;
+          comparisons++;
+        }
+      } else {
+        // Simple object comparison
+        totalDifference += JSON.stringify(item) !== JSON.stringify(sampleItem) ? 1 : 0;
+        comparisons++;
+      }
+    }
+
+    return comparisons > 0 ? totalDifference / comparisons : 0;
+  }
+
+  /**
+   * Calculate difference between two feature values
+   */
+  private calculateFeatureDifference(val1: any, val2: any): number {
+    if (typeof val1 === 'number' && typeof val2 === 'number') {
+      return Math.abs(val1 - val2);
+    }
+    if (typeof val1 === 'string' && typeof val2 === 'string') {
+      return val1 === val2 ? 0 : 1;
+    }
+    return JSON.stringify(val1) !== JSON.stringify(val2) ? 1 : 0;
+  }
+
+  /**
+   * Analyze sample quality
+   */
+  private analyzeSample(originalData: any[], sampleData: any[], analysisType: string): any {
+    const analysis: any = {
+      originalSize: originalData.length,
+      sampleSize: sampleData.length,
+      samplingRatio: sampleData.length / originalData.length,
+      timestamp: new Date().toISOString()
+    };
+
+    if (analysisType === 'basic') {
+      analysis.basic = {
+        representativeness: this.calculateRepresentativeness(originalData, sampleData),
+        bias: this.detectBias(originalData, sampleData),
+        coverage: this.calculateCoverage(originalData, sampleData)
+      };
+    }
+
+    return analysis;
+  }
+
+  /**
+   * Calculate representativeness score
+   */
+  private calculateRepresentativeness(original: any[], sample: any[]): number {
+    // Simplified representativeness calculation
+    if (original.length === 0 || sample.length === 0) return 0;
+    
+    const sampleRatio = sample.length / original.length;
+    return Math.min(1, sampleRatio * 2); // Simple heuristic
+  }
+
+  /**
+   * Detect sampling bias
+   */
+  private detectBias(original: any[], sample: any[]): string[] {
+    const biases: string[] = [];
+    
+    if (sample.length < original.length * 0.01) {
+      biases.push('Sample size too small');
+    }
+    
+    if (sample.length > original.length * 0.5) {
+      biases.push('Sample size very large');
+    }
+
+    return biases;
+  }
+
+  /**
+   * Calculate coverage
+   */
+  private calculateCoverage(original: any[], sample: any[]): number {
+    // Simplified coverage calculation
+    const uniqueOriginal = new Set(original.map(item => JSON.stringify(item)));
+    const uniqueSample = new Set(sample.map(item => JSON.stringify(item)));
+    
+    let intersection = 0;
+    for (const item of uniqueSample) {
+      if (uniqueOriginal.has(item)) {
+        intersection++;
+      }
+    }
+    
+    return uniqueOriginal.size > 0 ? intersection / uniqueOriginal.size : 0;
+  }
+
+  /**
+   * Generate synthetic data based on source patterns
+   */
+  private generateSyntheticData(
+    sourceData: any[], 
+    count: number, 
+    preserveDistribution: boolean, 
+    addNoise: number
+  ): any[] {
+    if (sourceData.length === 0) return [];
+
+    const synthetic: any[] = [];
+    
+    for (let i = 0; i < count; i++) {
+      // Simple synthetic generation: modify existing records
+      const baseItem = sourceData[Math.floor(Math.random() * sourceData.length)];
+      const syntheticItem = this.applySyntheticTransformation(baseItem, addNoise);
+      synthetic.push(syntheticItem);
+    }
+
+    return synthetic;
+  }
+
+  /**
+   * Apply synthetic transformation to an item
+   */
+  private applySyntheticTransformation(item: any, noiseLevel: number): any {
+    const synthetic = { ...item };
+    
+    for (const [key, value] of Object.entries(synthetic)) {
+      if (typeof value === 'number') {
+        const noise = (Math.random() - 0.5) * 2 * noiseLevel * Math.abs(value);
+        synthetic[key] = value + noise;
+      } else if (typeof value === 'string' && Math.random() < noiseLevel) {
+        // Simple string mutation
+        synthetic[key] = value + '_syn';
+      }
+    }
+
+    return synthetic;
+  }
+
+  /**
+   * Group data by a field
+   */
+  private groupBy(data: any[], field: string): { [key: string]: any[] } {
+    return data.reduce((groups, item) => {
+      const key = item[field] || 'undefined';
+      groups[key] = groups[key] || [];
+      groups[key].push(item);
+      return groups;
+    }, {});
+  }
+
+  /**
+   * Create sample result object
+   */
+  private createSampleResult(strategy: string, original: any[], sample: any[], metadata: string): SampleResult {
+    return {
+      id: `sample_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      strategy,
+      originalSize: original.length,
+      sampleSize: sample.length,
+      data: sample,
+      metadata: {
+        timestamp: new Date(),
+        confidence: this.calculateConfidence(original, sample),
+        bias: this.detectBias(original, sample),
+        representativeness: this.calculateRepresentativeness(original, sample)
+      }
+    };
+  }
+
+  /**
+   * Calculate confidence score
+   */
+  private calculateConfidence(original: any[], sample: any[]): number {
+    if (original.length === 0) return 0;
+    return Math.min(1, sample.length / Math.sqrt(original.length));
+  }
+
+  /**
+   * Get sampling strategies information
+   */
+  private getSamplingStrategiesInfo(): any {
+    return {
+      strategies: [
+        {
+          name: 'random',
+          description: 'Random selection from the population',
+          useCase: 'General purpose, unbiased sampling',
+          pros: ['Unbiased', 'Simple to implement'],
+          cons: ['May not represent all subgroups']
+        },
+        {
+          name: 'systematic',
+          description: 'Select every nth item after random start',
+          useCase: 'Ordered data with regular patterns',
+          pros: ['Even distribution', 'Easy to implement'],
+          cons: ['May miss periodic patterns']
+        },
+        {
+          name: 'stratified',
+          description: 'Sample from each subgroup proportionally',
+          useCase: 'When population has distinct subgroups',
+          pros: ['Ensures representation of all groups'],
+          cons: ['Requires knowledge of subgroups']
+        },
+        {
+          name: 'cluster',
+          description: 'Select entire clusters randomly',
+          useCase: 'When clusters are naturally occurring',
+          pros: ['Cost-effective for dispersed populations'],
+          cons: ['Higher sampling error']
+        }
+      ],
+      aiStrategies: [
+        {
+          name: 'representative',
+          description: 'AI-optimized for statistical representativeness',
+          useCase: 'When sample must reflect population statistics'
+        },
+        {
+          name: 'diverse',
+          description: 'Maximize diversity and variety in sample',
+          useCase: 'When exploring edge cases and variations'
+        },
+        {
+          name: 'informative',
+          description: 'Select most informative data points',
+          useCase: 'Active learning and model training'
+        }
+      ]
+    };
+  }
+
+  /**
+   * Get sampling best practices
+   */
+  private getSamplingBestPractices(): string {
+    return `# Sampling Best Practices
+
+## 1. Define Your Objectives
+- Clearly define what you want to learn from the sample
+- Consider the trade-offs between sample size and cost
+- Determine acceptable margin of error
+
+## 2. Choose the Right Strategy
+- **Random**: For general unbiased sampling
+- **Stratified**: When you need representation of all subgroups
+- **Systematic**: For ordered data with regular patterns
+- **Cluster**: When natural groupings exist
+
+## 3. Sample Size Considerations
+- Larger samples generally provide better estimates
+- Consider population size and desired confidence level
+- Balance statistical power with practical constraints
+
+## 4. Avoid Common Pitfalls
+- Selection bias: Ensure random selection
+- Non-response bias: Plan for missing data
+- Sampling frame issues: Ensure complete population coverage
+
+## 5. Quality Assessment
+- Always validate sample representativeness
+- Check for biases and outliers
+- Document sampling methodology
+
+## 6. AI-Enhanced Sampling
+- Use AI techniques for complex optimization
+- Consider active learning for iterative improvement
+- Validate AI-generated samples against traditional methods
+`;
+  }
+
+  /**
+   * Cleanup and shutdown
+   */
+  public async shutdown(): Promise<void> {
+    logger.info("Shutting down sampling service...");
+    this.cache.clear();
+    logger.info("Sampling service shutdown complete");
+  }
+}

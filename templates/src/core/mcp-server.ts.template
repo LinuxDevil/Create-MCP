@@ -1,0 +1,240 @@
+/**
+ * Core MCP Server implementation for {{PROJECT_NAME}}
+ * Handles server initialization, lifecycle, and coordination
+ */
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { logger } from "../utils/logger.js";
+import { ConfigManager, ServerConfig } from "./config.js";
+import { ToolRegistry } from "../tools/index.js";
+import { ResourceRegistry } from "../resources/index.js";
+import { PromptRegistry } from "../prompts/index.js";
+import { ElicitationService } from "../services/elicitation.js";
+import { SamplingService } from "../services/sampling.js";
+import { HealthChecker } from "../utils/health.js";
+
+export interface ServerCapabilities {
+  tools: boolean;
+  resources: boolean;
+  prompts: boolean;
+  elicitations: boolean;
+  sampling: boolean;
+  streaming: boolean;
+}
+
+export interface ServerStatus {
+  name: string;
+  version: string;
+  uptime: number;
+  capabilities: ServerCapabilities;
+  stats: {
+    toolCalls: number;
+    resourceAccess: number;
+    promptExecutions: number;
+    elicitationSessions: number;
+    samplingOperations: number;
+  };
+}
+
+export class {{PROJECT_NAME_PASCAL}}McpServer {
+  private mcpServer: McpServer;
+  private configManager: ConfigManager;
+  private config: ServerConfig;
+  private toolRegistry!: ToolRegistry;
+  private resourceRegistry!: ResourceRegistry;
+  private promptRegistry!: PromptRegistry;
+  private elicitationService!: ElicitationService;
+  private samplingService!: SamplingService;
+  private healthChecker!: HealthChecker;
+  private stats: ServerStatus['stats'];
+  private startTime: number;
+
+  constructor() {
+    this.configManager = ConfigManager.getInstance();
+    this.config = this.configManager.getServerConfig();
+    this.startTime = Date.now();
+    
+    this.mcpServer = new McpServer({
+      name: "{{PROJECT_NAME}}",
+      version: "1.0.0"
+    });
+
+    this.stats = {
+      toolCalls: 0,
+      resourceAccess: 0,
+      promptExecutions: 0,
+      elicitationSessions: 0,
+      samplingOperations: 0
+    };
+
+    this.initializeServices();
+    this.setupServer();
+  }
+
+  private initializeServices(): void {
+    logger.info("Initializing services...");
+
+    this.toolRegistry = new ToolRegistry(this.mcpServer, this.stats);
+    this.resourceRegistry = new ResourceRegistry(this.mcpServer, this.stats);
+    this.promptRegistry = new PromptRegistry(this.mcpServer, this.stats);
+    this.healthChecker = new HealthChecker();
+
+    // Initialize optional services based on configuration
+    if (this.configManager.isFeatureEnabled('elicitations')) {
+      this.elicitationService = new ElicitationService(
+        this.configManager.getElicitationConfig(),
+        this.stats
+      );
+      logger.info("Elicitation service enabled");
+    }
+
+    if (this.configManager.isFeatureEnabled('sampling')) {
+      this.samplingService = new SamplingService(
+        this.configManager.getSamplingConfig(),
+        this.stats
+      );
+      logger.info("Sampling service enabled");
+    }
+
+    logger.info("Services initialized successfully");
+  }
+
+  private setupServer(): void {
+    logger.info("Setting up MCP server...");
+
+    this.setupHealthChecks();
+    this.registerTools();
+    this.registerResources();
+    this.registerPrompts();
+
+    if (this.elicitationService) {
+      this.registerElicitationFeatures();
+    }
+
+    if (this.samplingService) {
+      this.registerSamplingFeatures();
+    }
+
+    logger.info("MCP server setup complete");
+  }
+
+  private setupHealthChecks(): void {
+    // Memory usage check
+    this.healthChecker.registerCheck('memory', async () => {
+      const usage = process.memoryUsage();
+      const heapUsedMB = Math.round(usage.heapUsed / 1024 / 1024);
+      return {
+        name: 'memory',
+        status: heapUsedMB < 500 ? 'pass' : 'warn',
+        message: `${heapUsedMB}MB used`
+      };
+    });
+
+    // Uptime check
+    this.healthChecker.registerCheck('uptime', async () => {
+      const uptimeSeconds = process.uptime();
+      return {
+        name: 'uptime',
+        status: 'pass',
+        message: `${Math.round(uptimeSeconds)}s`
+      };
+    });
+
+    // Configuration check
+    this.healthChecker.registerCheck('config', async () => {
+      const config = this.configManager.getServerConfig();
+      return {
+        name: 'config',
+        status: 'pass',
+        message: `Features: OAuth=${config.enableOAuth}, DNS=${config.enableDnsProtection}`
+      };
+    });
+  }
+
+  private registerTools(): void {
+    logger.debug("Registering tools...");
+    this.toolRegistry.registerAllTools();
+    logger.debug("Tools registered successfully");
+  }
+
+  private registerResources(): void {
+    logger.debug("Registering resources...");
+    this.resourceRegistry.registerAllResources(this.healthChecker, this.configManager);
+    logger.debug("Resources registered successfully");
+  }
+
+  private registerPrompts(): void {
+    logger.debug("Registering prompts...");
+    this.promptRegistry.registerAllPrompts();
+    logger.debug("Prompts registered successfully");
+  }
+
+  private registerElicitationFeatures(): void {
+    logger.debug("Registering elicitation features...");
+    this.elicitationService.registerTools(this.mcpServer);
+    this.elicitationService.registerPrompts(this.mcpServer);
+    logger.debug("Elicitation features registered successfully");
+  }
+
+  private registerSamplingFeatures(): void {
+    logger.debug("Registering sampling features...");
+    this.samplingService.registerTools(this.mcpServer);
+    this.samplingService.registerResources(this.mcpServer);
+    logger.debug("Sampling features registered successfully");
+  }
+
+  public async getStatus(): Promise<ServerStatus> {
+    const uptime = (Date.now() - this.startTime) / 1000;
+    const capabilities = this.getCapabilities();
+
+    return {
+      name: "{{PROJECT_NAME}}",
+      version: "1.0.0",
+      uptime,
+      capabilities,
+      stats: { ...this.stats }
+    };
+  }
+
+  public getCapabilities(): ServerCapabilities {
+    return {
+      tools: true,
+      resources: true,
+      prompts: true,
+      elicitations: this.configManager.isFeatureEnabled('elicitations'),
+      sampling: this.configManager.isFeatureEnabled('sampling'),
+      streaming: true
+    };
+  }
+
+  public getMcpServer(): McpServer {
+    return this.mcpServer;
+  }
+
+  public getHealthChecker(): HealthChecker {
+    return this.healthChecker;
+  }
+
+  public getElicitationService(): ElicitationService | undefined {
+    return this.elicitationService;
+  }
+
+  public getSamplingService(): SamplingService | undefined {
+    return this.samplingService;
+  }
+
+  public async shutdown(): Promise<void> {
+    logger.info("Shutting down MCP server...");
+
+    // Cleanup services
+    if (this.elicitationService) {
+      await this.elicitationService.shutdown();
+    }
+
+    if (this.samplingService) {
+      await this.samplingService.shutdown();
+    }
+
+    logger.info("MCP server shutdown complete");
+  }
+}

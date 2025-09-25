@@ -22,10 +22,20 @@ export async function detectPackageManager(): Promise<PackageManager> {
   return 'npm';
 }
 
+// Windows compatibility - npm is a .cmd file on Windows
+function getPackageManagerCommand(packageManager: string): string {
+  if (process.platform === 'win32') {
+    return `${packageManager}.cmd`;
+  }
+  return packageManager;
+}
+
 export async function isPackageManagerAvailable(pm: PackageManager): Promise<boolean> {
   return new Promise((resolve) => {
-    const child = spawn(pm, ['--version'], { stdio: 'ignore' });
+    const command = getPackageManagerCommand(pm);
+    const child = spawn(command, ['--version'], { stdio: 'ignore', shell: true });
     child.on('close', (code) => resolve(code === 0));
+    child.on('error', () => resolve(false));
   });
 }
 
@@ -67,29 +77,43 @@ async function executeCommand(
   options: { cwd: string }
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
+    const actualCommand = getPackageManagerCommand(command);
+    const child = spawn(actualCommand, args, {
       stdio: 'pipe',
+      shell: true, // Use shell to handle .cmd files on Windows
       ...options
+    });
+    
+    let errorOutput = '';
+    
+    child.stderr?.on('data', (data) => {
+      errorOutput += data.toString();
     });
     
     child.on('close', (code) => {
       if (code === 0) {
         resolve();
       } else {
-        reject(new Error(`Command failed with exit code ${code}`));
+        reject(new Error(`Command failed with exit code ${code}: ${errorOutput}`));
       }
     });
     
-    child.on('error', reject);
+    child.on('error', (error) => {
+      reject(new Error(`Failed to spawn command: ${error.message}`));
+    });
   });
 }
 
 async function getLatestVersion(packageName: string): Promise<string | null> {
   return new Promise((resolve) => {
-    const child = spawn('npm', ['view', packageName, 'version'], { stdio: 'pipe' });
+    const command = getPackageManagerCommand('npm');
+    const child = spawn(command, ['view', packageName, 'version'], { 
+      stdio: 'pipe',
+      shell: true 
+    });
     let output = '';
     
-    child.stdout.on('data', (data) => {
+    child.stdout?.on('data', (data) => {
       output += data.toString();
     });
     

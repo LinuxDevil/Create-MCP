@@ -63,20 +63,36 @@ export class ExampleService {
   /**
    * Example async operation with error handling
    */
-  async processData(data: string, format: 'json' | 'csv' | 'text'): Promise<any> {
-    logger.info(`Processing ${format} data`);
+  async processData(data: string, format: 'json' | 'csv' | 'text', operation: 'validate' | 'analyze' | 'transform'): Promise<any> {
+    logger.info(`Processing ${format} data with operation: ${operation}`);
     
     try {
-      switch (format) {
-        case 'json':
-          return JSON.parse(data);
-        case 'csv':
-          return this.parseCsv(data);
-        case 'text':
-          return { text: data, wordCount: data.split(/\s+/).length };
+      // Simple data processing simulation
+      let result: any;
+      switch (operation) {
+        case 'validate':
+          result = { valid: true, message: `${format} data appears valid` };
+          break;
+        case 'analyze':
+          result = { 
+            format,
+            length: data.length,
+            analysis: `Basic ${format} analysis complete`,
+            timestamp: new Date().toISOString()
+          };
+          break;
+        case 'transform':
+          result = { 
+            original_format: format,
+            transformed: data.toUpperCase(),
+            operation: 'transformation to uppercase'
+          };
+          break;
         default:
-          throw new Error(`Unsupported format: ${format}`);
+          throw new Error(`Unknown operation: ${operation}`);
       }
+      
+      return result;
     } catch (error) {
       logger.error(`Error processing ${format} data:`, error);
       throw error;

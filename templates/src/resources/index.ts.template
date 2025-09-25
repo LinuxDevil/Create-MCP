@@ -1,0 +1,143 @@
+/**
+ * Resource Registry for {{PROJECT_NAME}}
+ * Centralized registration and management of all MCP resources
+ */
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { logger } from "../utils/logger.js";
+import { ConfigManager } from "../core/config.js";
+import { HealthChecker } from "../utils/health.js";
+import { DataAnalysisResource } from "./data-analysis-resource.js";
+import { ServerInfoResource } from "./server-info-resource.js";
+
+export interface ResourceStats {
+  toolCalls: number;
+  resourceAccess: number;
+  promptExecutions: number;
+  elicitationSessions: number;
+  samplingOperations: number;
+}
+
+export interface BaseResource {
+  name: string;
+  register(
+    server: McpServer, 
+    stats: ResourceStats, 
+    healthChecker?: HealthChecker,
+    configManager?: ConfigManager
+  ): void;
+}
+
+export class ResourceRegistry {
+  private server: McpServer;
+  private stats: ResourceStats;
+  private resources: Map<string, BaseResource> = new Map();
+
+  constructor(server: McpServer, stats: ResourceStats) {
+    this.server = server;
+    this.stats = stats;
+    this.initializeResources();
+  }
+
+  /**
+   * Initialize all available resources
+   */
+  private initializeResources(): void {
+    // Comprehensive Data Analysis Resource - demonstrates all capabilities
+    this.resources.set('data-analysis', new DataAnalysisResource());
+    
+    // Server information and configuration
+    this.resources.set('server-info', new ServerInfoResource());
+
+    logger.debug(`Initialized ${this.resources.size} resources`);
+  }
+
+  /**
+   * Register all resources with the MCP server
+   */
+  public registerAllResources(healthChecker?: HealthChecker, configManager?: ConfigManager): void {
+    logger.debug("Registering resources with MCP server...");
+
+    let registeredCount = 0;
+    for (const [name, resource] of this.resources) {
+      try {
+        resource.register(this.server, this.stats, healthChecker, configManager);
+        registeredCount++;
+        logger.debug(`Registered resource: ${name}`);
+      } catch (error) {
+        logger.error(`Failed to register resource ${name}:`, error);
+      }
+    }
+
+    logger.info(`Successfully registered ${registeredCount}/${this.resources.size} resources`);
+  }
+
+  /**
+   * Register a specific resource
+   */
+  public registerResource(name: string, healthChecker?: HealthChecker, configManager?: ConfigManager): boolean {
+    const resource = this.resources.get(name);
+    if (!resource) {
+      logger.error(`Resource not found: ${name}`);
+      return false;
+    }
+
+    try {
+      resource.register(this.server, this.stats, healthChecker, configManager);
+      logger.info(`Resource registered: ${name}`);
+      return true;
+    } catch (error) {
+      logger.error(`Failed to register resource ${name}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Add a new resource to the registry
+   */
+  public addResource(name: string, resource: BaseResource): void {
+    if (this.resources.has(name)) {
+      logger.warn(`Resource ${name} already exists, overwriting`);
+    }
+
+    this.resources.set(name, resource);
+    logger.debug(`Added resource to registry: ${name}`);
+  }
+
+  /**
+   * Remove a resource from the registry
+   */
+  public removeResource(name: string): boolean {
+    const removed = this.resources.delete(name);
+    if (removed) {
+      logger.debug(`Removed resource from registry: ${name}`);
+    } else {
+      logger.warn(`Resource not found in registry: ${name}`);
+    }
+    return removed;
+  }
+
+  /**
+   * Get list of available resources
+   */
+  public getAvailableResources(): string[] {
+    return Array.from(this.resources.keys());
+  }
+
+  /**
+   * Get resource information
+   */
+  public getResourceInfo(): Array<{ name: string; registered: boolean }> {
+    return Array.from(this.resources.keys()).map(name => ({
+      name,
+      registered: true // In this implementation, resources are registered when added
+    }));
+  }
+
+  /**
+   * Get resource statistics
+   */
+  public getResourceStats(): ResourceStats {
+    return { ...this.stats };
+  }
+}

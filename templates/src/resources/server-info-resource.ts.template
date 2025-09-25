@@ -1,0 +1,492 @@
+/**
+ * Server Info Resource for {{PROJECT_NAME}}
+ * Comprehensive server information, configuration, and dynamic content
+ */
+
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { logger } from "../utils/logger.js";
+import { ConfigManager } from "../core/config.js";
+import { HealthChecker } from "../utils/health.js";
+import { BaseResource, ResourceStats } from "./index.js";
+
+export class ServerInfoResource implements BaseResource {
+  public readonly name = "server-info";
+
+  public register(
+    server: McpServer, 
+    stats: ResourceStats, 
+    healthChecker?: HealthChecker,
+    configManager?: ConfigManager
+  ): void {
+    // Main server information resource
+    server.registerResource(
+      this.name,
+      "server://info",
+      {
+        title: "Server Information",
+        description: "Comprehensive information about this MCP server including capabilities, status, and configuration",
+        mimeType: "application/json"
+      },
+      async () => {
+        logger.debug("Server info resource accessed");
+        stats.resourceAccess++;
+
+        try {
+          const serverInfo = await this.generateServerInfo(stats, healthChecker, configManager);
+          
+          return {
+            contents: [{
+              uri: "server://info",
+              text: JSON.stringify(serverInfo, null, 2),
+              mimeType: "application/json"
+            }]
+          };
+
+        } catch (error) {
+          logger.error("Error generating server info:", error);
+          return {
+            contents: [{
+              uri: "server://info",
+              text: JSON.stringify({
+                error: "Failed to generate server information",
+                message: error instanceof Error ? error.message : "Unknown error",
+                timestamp: new Date().toISOString()
+              }, null, 2),
+              mimeType: "application/json"
+            }]
+          };
+        }
+      }
+    );
+
+    // Configuration resource
+    server.registerResource(
+      "server-config",
+      "server://config",
+      {
+        title: "Server Configuration",
+        description: "Current server configuration and runtime settings",
+        mimeType: "application/json"
+      },
+      async () => {
+        stats.resourceAccess++;
+        const configData = this.generateConfigData(configManager);
+        return {
+          contents: [{
+            uri: "server://config",
+            text: JSON.stringify(configData, null, 2),
+            mimeType: "application/json"
+          }]
+        };
+      }
+    );
+
+    // Dynamic welcome message using ResourceTemplate
+    server.registerResource(
+      "welcome",
+      new ResourceTemplate("server://welcome/{name}", { list: undefined }),
+      {
+        title: "Welcome Message",
+        description: "Personalized welcome messages with server capabilities overview",
+        mimeType: "text/plain"
+      },
+      async (uri, { name }) => {
+        stats.resourceAccess++;
+        const nameStr = Array.isArray(name) ? name[0] : name;
+        const welcomeMessage = this.generateWelcomeMessage(nameStr, configManager);
+        return {
+          contents: [{
+            uri: uri.href,
+            text: welcomeMessage,
+            mimeType: "text/plain"
+          }]
+        };
+      }
+    );
+
+    // API documentation resource
+    server.registerResource(
+      "api-docs",
+      "server://api-docs",
+      {
+        title: "API Documentation",
+        description: "Complete API documentation for {{PROJECT_NAME}} server",
+        mimeType: "text/markdown"
+      },
+      async () => {
+        stats.resourceAccess++;
+        const apiDocs = this.generateApiDocumentation();
+        return {
+          contents: [{
+            uri: "server://api-docs",
+            text: apiDocs,
+            mimeType: "text/markdown"
+          }]
+        };
+      }
+    );
+
+    logger.debug("Server Info resource registered successfully");
+  }
+
+  /**
+   * Generate comprehensive server information
+   */
+  private async generateServerInfo(
+    stats: ResourceStats,
+    healthChecker?: HealthChecker,
+    configManager?: ConfigManager
+  ): Promise<any> {
+    const serverInfo: any = {
+      server: {
+        name: "{{PROJECT_NAME}}",
+        version: "1.0.0",
+        description: "{{PROJECT_DESCRIPTION}}",
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+      },
+
+      architecture: {
+        modular_design: true,
+        components: [
+          "Core MCP Server",
+          "Transport Layer (Stdio/HTTP)",
+          "Tool Registry",
+          "Resource Registry", 
+          "Prompt Registry",
+          "Elicitation Service",
+          "Sampling Service"
+        ],
+        separation_of_concerns: "Clean architectural separation with dependency injection"
+      },
+
+      capabilities: {
+        core: {
+          tools: 2,
+          resources: 2, 
+          prompts: 1,
+          streaming: true
+        },
+        advanced: {
+          elicitations: configManager?.isFeatureEnabled('elicitations') ?? true,
+          sampling: configManager?.isFeatureEnabled('sampling') ?? true,
+          ai_sampling: configManager?.getSamplingConfig()?.enableAISampling ?? false
+        }
+      },
+
+      available_tools: [
+        {
+          name: "data-analysis",
+          description: "Comprehensive data analysis with multiple methodologies",
+          features: ["5 analysis types", "6 sampling strategies", "Elicitation integration", "Statistical analysis"],
+          demonstrates: "Tools, Sampling, Elicitation, Statistical Analysis"
+        },
+        {
+          name: "server-status",
+          description: "Server health and performance monitoring",
+          features: ["Health metrics", "Usage statistics", "System information", "Memory monitoring"],
+          demonstrates: "System monitoring, Performance tracking"
+        }
+      ],
+
+      available_resources: [
+        {
+          name: "data-analysis",
+          endpoints: ["methodology", "template/{type}", "sampling-guide", "elicitation-workflows", "best-practices"],
+          description: "Complete data analysis documentation and templates",
+          demonstrates: "Resources, Templates, Documentation, Best Practices"
+        },
+        {
+          name: "server-info", 
+          endpoints: ["info", "config", "welcome/{name}", "api-docs"],
+          description: "Server information and documentation",
+          demonstrates: "Dynamic resources, Configuration access"
+        }
+      ],
+
+      available_prompts: [
+        {
+          name: "research-analysis",
+          methodologies: ["data-analysis", "code-review", "system-design", "literature-review", "comparative-analysis", "case-study", "experimental-design", "survey-research"],
+          description: "Comprehensive research analysis prompt generation",
+          demonstrates: "Prompts, Multiple methodologies, Flexible contexts"
+        }
+      ],
+
+      usage_statistics: {
+        tool_calls: stats.toolCalls,
+        resource_access: stats.resourceAccess,
+        prompt_executions: stats.promptExecutions,
+        elicitation_sessions: stats.elicitationSessions,
+        sampling_operations: stats.samplingOperations,
+        total_operations: stats.toolCalls + stats.resourceAccess + stats.promptExecutions
+      }
+    };
+
+    // Add health information if available
+    if (healthChecker) {
+      try {
+        serverInfo.health = await healthChecker.getStatus();
+      } catch (error) {
+        serverInfo.health = { status: 'unknown', error: 'Health check failed' };
+      }
+    }
+
+    // Add configuration info if available
+    if (configManager) {
+      serverInfo.runtime_config = {
+        transport: configManager.getTransportConfig(),
+        features: {
+          elicitations_enabled: configManager.isFeatureEnabled('elicitations'),
+          sampling_enabled: configManager.isFeatureEnabled('sampling'),
+          oauth_enabled: configManager.isFeatureEnabled('oauth'),
+          dns_protection_enabled: configManager.isFeatureEnabled('dns-protection')
+        }
+      };
+    }
+
+    return serverInfo;
+  }
+
+  /**
+   * Generate configuration data
+   */
+  private generateConfigData(configManager?: ConfigManager): any {
+    const configData: any = {
+      server: {
+        name: "{{PROJECT_NAME}}",
+        version: "1.0.0",
+        timestamp: new Date().toISOString()
+      },
+      
+      default_configuration: {
+        transport: {
+          type: "stdio",
+          version: "2025-03-26",
+          features: ["sse", "session-management"]
+        },
+        security: {
+          dnsProtection: true,
+          allowedHosts: ["127.0.0.1", "localhost"],
+          oauth: false
+        },
+        features: {
+          tools: true,
+          resources: true,
+          prompts: true,
+          elicitations: true,
+          sampling: true,
+          streaming: true
+        }
+      }
+    };
+
+    if (configManager) {
+      try {
+        configData.current_configuration = {
+          server: configManager.getServerConfig(),
+          transport: configManager.getTransportConfig(),
+          elicitation: configManager.getElicitationConfig(),
+          sampling: configManager.getSamplingConfig()
+        };
+      } catch (error) {
+        configData.configError = "Failed to retrieve live configuration";
+      }
+    }
+
+    return configData;
+  }
+
+  /**
+   * Generate personalized welcome message
+   */
+  private generateWelcomeMessage(name: string, configManager?: ConfigManager): string {
+    const features = this.getEnabledFeatures(configManager);
+    
+    let message = `Hello, ${name}! Welcome to {{PROJECT_NAME}}.
+
+This is a modern Model Context Protocol server with advanced data analysis capabilities.
+
+🔧 Available Tools:
+• data-analysis - Comprehensive analysis with 5 methodologies
+• server-status - Health monitoring and statistics
+
+📋 Available Resources:
+• data-analysis resources - Methodology guides and templates
+• server-info resources - Configuration and documentation
+
+✨ Key Features:
+${features.map(feature => `• ${feature}`).join('\n')}
+
+🚀 Quick Start:
+1. Try the data-analysis tool with your dataset
+2. Use elicitation for interactive guidance
+3. Access methodology resources for best practices
+4. Check server-status for monitoring
+
+Ready to analyze your data? Let's get started!`;
+
+    return message;
+  }
+
+  /**
+   * Get list of enabled features
+   */
+  private getEnabledFeatures(configManager?: ConfigManager): string[] {
+    const features = [
+      'Multiple Analysis Types (exploratory, descriptive, diagnostic, predictive, prescriptive)',
+      'Intelligent Sampling (6 strategies including AI-enhanced)',
+      'Interactive Elicitation for guided analysis',
+      'Statistical Analysis and Pattern Detection',
+      'Modular Architecture with Clean Separation'
+    ];
+    
+    if (configManager) {
+      if (configManager.isFeatureEnabled('oauth')) {
+        features.push('OAuth Authentication');
+      }
+      if (configManager.getSamplingConfig()?.enableAISampling) {
+        features.push('Advanced AI Sampling Techniques');
+      }
+      if (configManager.getTransportConfig()?.enableCors) {
+        features.push('CORS Support for Browser Integration');
+      }
+    }
+    
+    return features;
+  }
+
+  /**
+   * Generate API documentation
+   */
+  private generateApiDocumentation(): string {
+    return `# {{PROJECT_NAME}} API Documentation
+
+## Overview
+{{PROJECT_NAME}} is a modern Model Context Protocol server demonstrating comprehensive data analysis capabilities with clean architectural separation.
+
+## Tools
+
+### data-analysis
+Comprehensive data analysis tool with multiple methodologies and advanced features.
+
+**Parameters:**
+- \`data\` (required): Array of objects representing your dataset
+- \`analysis_type\`: 'exploratory' | 'descriptive' | 'diagnostic' | 'predictive' | 'prescriptive'
+- \`target_fields\`: Optional array of field names to focus analysis on
+- \`sampling_strategy\`: 'none' | 'random' | 'systematic' | 'stratified' | 'ai-representative' | 'ai-diverse'
+- \`sample_size\`: Number (10-1000) - sample size if sampling is used
+- \`enable_elicitation\`: Boolean - enable interactive guidance
+- \`output_format\`: 'summary' | 'detailed' | 'statistical' | 'insights'
+- \`confidence_level\`: Number (0.8-0.99) - statistical confidence level
+
+**Example:**
+\`\`\`json
+{
+  "data": [{"age": 25, "score": 85}, {"age": 30, "score": 92}],
+  "analysis_type": "exploratory",
+  "sampling_strategy": "ai-representative",
+  "sample_size": 100,
+  "enable_elicitation": true,
+  "output_format": "detailed"
+}
+\`\`\`
+
+### server-status
+Monitor server health, performance, and usage statistics.
+
+**Parameters:**
+- \`include_details\`: Boolean - include detailed system information
+- \`format\`: 'json' | 'summary' - output format
+
+**Example:**
+\`\`\`json
+{
+  "include_details": true,
+  "format": "json"
+}
+\`\`\`
+
+## Resources
+
+### data-analysis Resources
+- \`analysis://methodology\` - Complete methodology guide
+- \`analysis://template/{type}\` - Dynamic analysis templates
+- \`analysis://sampling-guide\` - Sampling strategies documentation
+- \`analysis://elicitation-workflows\` - Interactive workflows
+- \`analysis://best-practices\` - Best practices guide
+
+### server-info Resources  
+- \`server://info\` - Comprehensive server information
+- \`server://config\` - Configuration details
+- \`server://welcome/{name}\` - Personalized welcome messages
+- \`server://api-docs\` - This documentation
+
+## Prompts
+
+### research-analysis
+Generate comprehensive research analysis prompts for various methodologies and contexts.
+
+**Parameters:**
+- \`topic\` (required): Research topic, question, or subject to analyze
+- \`methodology\`: 'data-analysis' | 'code-review' | 'system-design' | 'literature-review' | 'comparative-analysis' | 'case-study' | 'experimental-design' | 'survey-research'
+- \`context\`: Domain, business, or academic context
+- \`depth\`: 'overview' | 'detailed' | 'comprehensive' | 'expert'
+- \`audience\`: 'general' | 'technical' | 'academic' | 'executive'
+- \`output_format\`: 'structured' | 'narrative' | 'academic' | 'business'
+- \`include_methodology\`: Boolean - include methodology explanation
+- \`include_examples\`: Boolean - include examples and templates
+
+**Example:**
+\`\`\`json
+{
+  "topic": "Customer data analysis for churn prediction",
+  "methodology": "data-analysis",
+  "context": "E-commerce business with subscription model",
+  "depth": "comprehensive",
+  "audience": "technical",
+  "output_format": "structured",
+  "include_methodology": true
+}
+\`\`\`
+
+## Advanced Features
+
+### Elicitation Integration
+Enable interactive analysis guidance:
+1. Set \`enable_elicitation: true\` in data-analysis tool
+2. Use returned questions to start elicitation session
+3. Follow interactive workflow for guided analysis
+
+### Sampling Strategies
+Choose appropriate sampling for your dataset:
+- **Small datasets (<100)**: Use \`sampling_strategy: "none"\`
+- **Medium datasets (100-1000)**: Use \`"systematic"\` or \`"random"\`
+- **Large datasets (>1000)**: Use \`"ai-representative"\` or \`"ai-diverse"\`
+
+### Multi-Stage Analysis
+Combine different analysis types for comprehensive insights:
+1. Start with 'exploratory' to understand data
+2. Use 'descriptive' for statistical summaries
+3. Apply 'diagnostic' for causal analysis
+4. Use 'predictive' for forecasting
+5. Finish with 'prescriptive' for recommendations
+
+## Best Practices
+
+1. **Always start with exploratory analysis** for unknown datasets
+2. **Use appropriate sampling** for large datasets to improve performance
+3. **Enable elicitation** for complex or unfamiliar data
+4. **Validate findings** using multiple analysis approaches
+5. **Document methodology** and assumptions
+
+## Error Handling
+All tools provide comprehensive error messages with suggestions for resolution. Common issues:
+- Invalid data format → Ensure data is array of objects
+- Sample size too large → Reduce sample_size parameter
+- Missing required fields → Check data structure and field names
+
+For additional support, access the methodology and best practices resources.
+`;
+  }
+}

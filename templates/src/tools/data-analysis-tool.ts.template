@@ -1,0 +1,510 @@
+/**
+ * Data Analysis Tool for {{PROJECT_NAME}}
+ * Comprehensive tool demonstrating all MCP capabilities:
+ * - Advanced data processing and analysis
+ * - Integration with elicitation services
+ * - Integration with sampling services
+ * - Multiple analysis modes and methodologies
+ * - Statistical computations and insights
+ */
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+import { logger } from "../utils/logger.js";
+import { BaseTool, ToolStats } from "./index.js";
+
+export class DataAnalysisTool implements BaseTool {
+  public readonly name = "data-analysis";
+
+  public register(server: McpServer, stats: ToolStats): void {
+    server.registerTool(
+      this.name,
+      {
+        title: "Data Analysis Assistant",
+        description: "Comprehensive data analysis tool with elicitation, sampling, and statistical capabilities",
+        inputSchema: {
+          data: z.array(z.record(z.any())).describe("Dataset to analyze (array of objects)"),
+          analysis_type: z.enum([
+            'exploratory', 'descriptive', 'diagnostic', 'predictive', 'prescriptive'
+          ]).describe("Type of analysis to perform"),
+          target_fields: z.array(z.string()).optional().describe("Specific fields to focus analysis on"),
+          sampling_strategy: z.enum([
+            'none', 'random', 'systematic', 'stratified', 'ai-representative', 'ai-diverse'
+          ]).optional().describe("Sampling strategy for large datasets"),
+          sample_size: z.number().min(10).max(1000).optional().describe("Sample size if sampling is used"),
+          enable_elicitation: z.boolean().optional().describe("Enable interactive elicitation for analysis guidance"),
+          output_format: z.enum(['summary', 'detailed', 'statistical', 'insights']).optional().describe("Output format preference"),
+          confidence_level: z.number().min(0.8).max(0.99).optional().describe("Statistical confidence level (0.8-0.99)")
+        }
+      },
+      async ({ 
+        data, 
+        analysis_type, 
+        target_fields, 
+        sampling_strategy = 'none', 
+        sample_size = 100,
+        enable_elicitation = false,
+        output_format = 'detailed',
+        confidence_level = 0.95
+      }) => {
+        logger.info(`Data analysis initiated: ${analysis_type} analysis on ${data.length} records`);
+        stats.toolCalls++;
+
+        try {
+          // Step 1: Data validation
+          const validationResult = this.validateData(data);
+          if (!validationResult.valid) {
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify({
+                  error: "Data validation failed",
+                  issues: validationResult.issues,
+                  suggestions: validationResult.suggestions
+                }, null, 2)
+              }],
+              isError: true
+            };
+          }
+
+          // Step 2: Apply sampling if needed
+          let analysisData = data;
+          let samplingInfo = null;
+          
+          if (sampling_strategy !== 'none' && data.length > sample_size) {
+            const samplingResult = this.applySampling(data, sampling_strategy, sample_size, target_fields);
+            analysisData = samplingResult.sample;
+            samplingInfo = samplingResult.metadata;
+            stats.samplingOperations++;
+          }
+
+          // Step 3: Perform analysis
+          const analysisResult = this.performAnalysis(analysisData, analysis_type, target_fields, confidence_level);
+
+          // Step 4: Generate elicitation questions if enabled
+          let elicitationQuestions = null;
+          if (enable_elicitation) {
+            elicitationQuestions = this.generateElicitationQuestions(analysisResult, analysis_type);
+            stats.elicitationSessions++;
+          }
+
+          // Step 5: Format output
+          const output = this.formatOutput({
+            originalDataSize: data.length,
+            analysisDataSize: analysisData.length,
+            analysisType: analysis_type,
+            samplingInfo,
+            analysisResult,
+            elicitationQuestions,
+            outputFormat: output_format,
+            confidence_level
+          });
+
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(output, null, 2)
+            }]
+          };
+
+        } catch (error) {
+          logger.error("Data analysis error:", error);
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                error: "Analysis failed",
+                message: error instanceof Error ? error.message : 'Unknown error',
+                suggestions: [
+                  "Check data format (should be array of objects)",
+                  "Ensure numeric fields contain valid numbers",
+                  "Try a smaller sample size for large datasets"
+                ]
+              }, null, 2)
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    logger.debug("Data Analysis tool registered successfully");
+  }
+
+  private validateData(data: any[]): { valid: boolean; issues: string[]; suggestions: string[] } {
+    const issues: string[] = [];
+    const suggestions: string[] = [];
+
+    if (!Array.isArray(data) || data.length === 0) {
+      issues.push("Data must be a non-empty array");
+      suggestions.push("Provide data as an array of objects");
+    }
+
+    if (data.length < 5) {
+      issues.push("Dataset too small for meaningful analysis");
+      suggestions.push("Provide at least 5 records for analysis");
+    }
+
+    return { valid: issues.length === 0, issues, suggestions };
+  }
+
+  private applySampling(data: any[], strategy: string, sampleSize: number, targetFields?: string[]): any {
+    let sample: any[];
+    
+    switch (strategy) {
+      case 'random':
+        sample = this.randomSample(data, sampleSize);
+        break;
+      case 'systematic':
+        sample = this.systematicSample(data, sampleSize);
+        break;
+      case 'stratified':
+        sample = this.stratifiedSample(data, sampleSize, targetFields?.[0]);
+        break;
+      case 'ai-representative':
+        sample = this.systematicSample(data, sampleSize); // Simplified
+        break;
+      case 'ai-diverse':
+        sample = this.diverseSample(data, sampleSize, targetFields);
+        break;
+      default:
+        sample = this.randomSample(data, sampleSize);
+    }
+
+    return {
+      sample,
+      metadata: { strategy, originalSize: data.length, sampleSize: sample.length }
+    };
+  }
+
+  private randomSample(data: any[], size: number): any[] {
+    return [...data].sort(() => 0.5 - Math.random()).slice(0, size);
+  }
+
+  private systematicSample(data: any[], size: number): any[] {
+    const interval = Math.floor(data.length / size);
+    const sample: any[] = [];
+    for (let i = 0; i < data.length && sample.length < size; i += interval) {
+      sample.push(data[i]);
+    }
+    return sample;
+  }
+
+  private stratifiedSample(data: any[], size: number, field?: string): any[] {
+    if (!field) return this.randomSample(data, size);
+    
+    const groups = this.groupBy(data, field);
+    const sample: any[] = [];
+    const groupKeys = Object.keys(groups);
+    const samplePerGroup = Math.floor(size / groupKeys.length);
+    
+    for (const key of groupKeys) {
+      const groupSample = this.randomSample(groups[key], Math.min(samplePerGroup, groups[key].length));
+      sample.push(...groupSample);
+    }
+    
+    return sample.slice(0, size);
+  }
+
+  private diverseSample(data: any[], size: number, targetFields?: string[]): any[] {
+    const sample: any[] = [];
+    const remaining = [...data];
+
+    while (sample.length < size && remaining.length > 0) {
+      if (sample.length === 0) {
+        const index = Math.floor(Math.random() * remaining.length);
+        sample.push(remaining.splice(index, 1)[0]);
+      } else {
+        // Find most diverse record (simplified diversity calculation)
+        let maxDiversityIndex = 0;
+        let maxDiversity = -1;
+
+        for (let i = 0; i < remaining.length; i++) {
+          const diversity = this.calculateDiversity(remaining[i], sample, targetFields);
+          if (diversity > maxDiversity) {
+            maxDiversity = diversity;
+            maxDiversityIndex = i;
+          }
+        }
+        sample.push(remaining.splice(maxDiversityIndex, 1)[0]);
+      }
+    }
+
+    return sample;
+  }
+
+  private calculateDiversity(record: any, sample: any[], targetFields?: string[]): number {
+    if (sample.length === 0) return 1;
+    
+    const fields = targetFields || Object.keys(record);
+    let differences = 0;
+    let comparisons = 0;
+
+    for (const existing of sample) {
+      for (const field of fields) {
+        if (record[field] !== undefined && existing[field] !== undefined) {
+          differences += record[field] === existing[field] ? 0 : 1;
+          comparisons++;
+        }
+      }
+    }
+
+    return comparisons > 0 ? differences / comparisons : 0;
+  }
+
+  private groupBy(data: any[], field: string): { [key: string]: any[] } {
+    return data.reduce((groups, item) => {
+      const key = String(item[field] || 'undefined');
+      groups[key] = groups[key] || [];
+      groups[key].push(item);
+      return groups;
+    }, {});
+  }
+
+  private performAnalysis(data: any[], analysisType: string, targetFields?: string[], confidenceLevel: number = 0.95): any {
+    const numericFields = this.getNumericFields(data);
+    const fieldsToAnalyze = targetFields || numericFields;
+
+    const analysis = {
+      type: analysisType,
+      recordCount: data.length,
+      fieldsAnalyzed: fieldsToAnalyze,
+      timestamp: new Date().toISOString(),
+      results: {} as any
+    };
+
+    switch (analysisType) {
+      case 'exploratory':
+        analysis.results = {
+          summary: "Initial data exploration completed",
+          dataProfile: this.getDataProfile(data),
+          fieldStatistics: this.calculateFieldStats(data, fieldsToAnalyze),
+          patterns: [`Analyzed ${data.length} records`, `Found ${fieldsToAnalyze.length} numeric fields`]
+        };
+        break;
+
+      case 'descriptive':
+        analysis.results = {
+          summary: "Statistical description of data characteristics",
+          statistics: this.calculateFieldStats(data, fieldsToAnalyze),
+          distributions: "Distribution analysis available"
+        };
+        break;
+
+      case 'diagnostic':
+        analysis.results = {
+          summary: "Investigation of causes and relationships",
+          anomalies: this.detectSimpleAnomalies(data, fieldsToAnalyze),
+          relationships: "Relationship analysis between variables"
+        };
+        break;
+
+      case 'predictive':
+        analysis.results = {
+          summary: "Forecasting and trend analysis",
+          trends: this.identifyTrends(data, fieldsToAnalyze),
+          forecasts: "Forecast models can be developed"
+        };
+        break;
+
+      case 'prescriptive':
+        analysis.results = {
+          summary: "Actionable recommendations",
+          recommendations: this.generateRecommendations(data, fieldsToAnalyze),
+          actionPlan: this.createActionPlan()
+        };
+        break;
+
+      default:
+        analysis.results = { summary: "Analysis completed", data: "Basic analysis performed" };
+    }
+
+    return analysis;
+  }
+
+  private getNumericFields(data: any[]): string[] {
+    if (data.length === 0) return [];
+    return Object.keys(data[0]).filter(key => typeof data[0][key] === 'number');
+  }
+
+  private getDataProfile(data: any[]): any {
+    if (data.length === 0) return {};
+    
+    const fields = Object.keys(data[0]);
+    const fieldTypes: { [key: string]: string } = {};
+    
+    fields.forEach(field => {
+      const sampleValue = data[0][field];
+      fieldTypes[field] = typeof sampleValue;
+    });
+
+    return {
+      totalRecords: data.length,
+      totalFields: fields.length,
+      fieldTypes
+    };
+  }
+
+  private calculateFieldStats(data: any[], fields: string[]): any {
+    const stats: { [key: string]: any } = {};
+    
+    fields.forEach(field => {
+      const values = data.map(row => Number(row[field])).filter(v => !isNaN(v));
+      if (values.length > 0) {
+        const sorted = [...values].sort((a, b) => a - b);
+        stats[field] = {
+          count: values.length,
+          mean: values.reduce((sum, val) => sum + val, 0) / values.length,
+          median: sorted[Math.floor(sorted.length / 2)],
+          min: Math.min(...values),
+          max: Math.max(...values)
+        };
+      }
+    });
+
+    return stats;
+  }
+
+  private detectSimpleAnomalies(data: any[], fields: string[]): string[] {
+    const anomalies: string[] = [];
+    
+    fields.forEach(field => {
+      const values = data.map(row => Number(row[field])).filter(v => !isNaN(v));
+      if (values.length > 0) {
+        const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+        const outliers = values.filter(v => Math.abs(v - mean) > 2 * mean);
+        if (outliers.length > 0) {
+          anomalies.push(`${field}: Found ${outliers.length} potential outliers`);
+        }
+      }
+    });
+
+    return anomalies;
+  }
+
+  private identifyTrends(data: any[], fields: string[]): string[] {
+    return [`Trend analysis available for ${fields.length} numeric fields`];
+  }
+
+  private generateRecommendations(data: any[], fields: string[]): string[] {
+    return [
+      "Consider collecting additional data for more robust analysis",
+      "Validate findings with domain experts",
+      "Monitor key metrics identified in the analysis",
+      "Implement data quality checks"
+    ];
+  }
+
+  private createActionPlan(): any {
+    return {
+      immediate: ["Review analysis results", "Validate key findings"],
+      shortTerm: ["Implement monitoring", "Gather additional data"],
+      longTerm: ["Develop predictive models", "Create automated reporting"]
+    };
+  }
+
+  private generateElicitationQuestions(analysisResult: any, analysisType: string): string[] {
+    const questions: string[] = [];
+    
+    switch (analysisType) {
+      case 'exploratory':
+        questions.push("What specific patterns in the data are most interesting to you?");
+        questions.push("Which variables do you think might be most important?");
+        break;
+      case 'descriptive':
+        questions.push("Do the statistical summaries align with your expectations?");
+        questions.push("Which metrics are most relevant for your decisions?");
+        break;
+      case 'diagnostic':
+        questions.push("What potential causes would you like to investigate?");
+        questions.push("Are there external factors to consider?");
+        break;
+      case 'predictive':
+        questions.push("What time horizon interests you most?");
+        questions.push("What accuracy level do you need?");
+        break;
+      case 'prescriptive':
+        questions.push("What are your primary business objectives?");
+        questions.push("What constraints should we consider?");
+        break;
+    }
+
+    questions.push("Would you like to focus on specific data segments?");
+    questions.push("Any specific hypotheses to test?");
+
+    return questions;
+  }
+
+  private formatOutput(params: any): any {
+    const { 
+      originalDataSize, 
+      analysisDataSize, 
+      analysisType, 
+      samplingInfo, 
+      analysisResult, 
+      elicitationQuestions,
+      outputFormat,
+      confidence_level
+    } = params;
+
+    const output: any = {
+      analysis_metadata: {
+        type: analysisType,
+        timestamp: new Date().toISOString(),
+        confidence_level,
+        data_summary: {
+          original_size: originalDataSize,
+          analysis_size: analysisDataSize,
+          sampling_applied: samplingInfo !== null
+        }
+      }
+    };
+
+    if (samplingInfo) {
+      output.sampling_details = samplingInfo;
+    }
+
+    switch (outputFormat) {
+      case 'summary':
+        output.results = {
+          summary: analysisResult.results?.summary || `${analysisType} analysis completed`,
+          key_findings: [`Analyzed ${analysisDataSize} records`, `Analysis type: ${analysisType}`]
+        };
+        break;
+      case 'statistical':
+        output.results = {
+          statistics: analysisResult.results?.statistics || analysisResult.results?.fieldStatistics,
+          methodology: `${analysisType} analysis with ${confidence_level * 100}% confidence`
+        };
+        break;
+      case 'insights':
+        output.results = {
+          insights: [`Performed ${analysisType} analysis on ${analysisDataSize} records`],
+          recommendations: analysisResult.results?.recommendations || []
+        };
+        break;
+      case 'detailed':
+      default:
+        output.results = analysisResult.results;
+        break;
+    }
+
+    if (elicitationQuestions) {
+      output.interactive_exploration = {
+        questions: elicitationQuestions,
+        instruction: "Use these questions to start an elicitation session for deeper analysis"
+      };
+    }
+
+    output.next_steps = {
+      suggestions: [
+        "Review the analysis results and validate key findings",
+        "Consider running additional analysis types",
+        "Use elicitation questions for interactive exploration",
+        "Apply different sampling strategies for comparison"
+      ]
+    };
+
+    return output;
+  }
+}

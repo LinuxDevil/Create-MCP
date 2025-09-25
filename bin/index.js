@@ -1,4 +1,4 @@
 #!/usr/bin/env node
 
 // Binary entry point for create-mcp CLI
-require('../dist/cli/index.js');
+import '../lib/cli/index.js';

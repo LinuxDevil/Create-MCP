@@ -1,0 +1,149 @@
+/**
+ * Server Status Tool for {{PROJECT_NAME}}
+ * Simple server monitoring and health check functionality
+ */
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+import { logger } from "../utils/logger.js";
+import { BaseTool, ToolStats } from "./index.js";
+
+export class ServerStatusTool implements BaseTool {
+  public readonly name = "server-status";
+
+  public register(server: McpServer, stats: ToolStats): void {
+    server.registerTool(
+      this.name,
+      {
+        title: "Server Status Monitor",
+        description: "Get comprehensive server status, health metrics, and usage statistics",
+        inputSchema: {
+          include_details: z.boolean().optional().describe("Include detailed system information"),
+          format: z.enum(['json', 'summary']).optional().describe("Output format")
+        }
+      },
+      async ({ include_details = true, format = 'json' }) => {
+        logger.info("Server status requested");
+        stats.toolCalls++;
+
+        try {
+          const statusData = await this.collectStatusData(stats, include_details);
+          
+          if (format === 'summary') {
+            const summary = this.formatSummary(statusData);
+            return {
+              content: [{
+                type: "text",
+                text: summary
+              }]
+            };
+          }
+
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(statusData, null, 2)
+            }]
+          };
+
+        } catch (error) {
+          logger.error("Server status error:", error);
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                error: "Failed to retrieve server status",
+                message: error instanceof Error ? error.message : 'Unknown error'
+              }, null, 2)
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    logger.debug("Server Status tool registered successfully");
+  }
+
+  private async collectStatusData(stats: ToolStats, includeDetails: boolean): Promise<any> {
+    const statusData: any = {
+      server: {
+        name: "{{PROJECT_NAME}}",
+        version: "1.0.0",
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString()
+      },
+      health: {
+        status: 'healthy',
+        memory: this.getMemoryInfo(),
+        process: {
+          pid: process.pid,
+          platform: process.platform,
+          nodeVersion: process.version
+        }
+      },
+      usage_statistics: {
+        tool_calls: stats.toolCalls,
+        resource_access: stats.resourceAccess,
+        prompt_executions: stats.promptExecutions,
+        elicitation_sessions: stats.elicitationSessions,
+        sampling_operations: stats.samplingOperations
+      },
+      capabilities: {
+        tools: true,
+        resources: true,
+        prompts: true,
+        elicitations: true,
+        sampling: true,
+        streaming: true
+      }
+    };
+
+    if (includeDetails) {
+      statusData.system_details = {
+        architecture: process.arch,
+        environment: process.env.NODE_ENV || 'development',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        memory_usage: process.memoryUsage()
+      };
+    }
+
+    return statusData;
+  }
+
+  private getMemoryInfo(): any {
+    const memoryUsage = process.memoryUsage();
+    const heapUsedMB = Math.round(memoryUsage.heapUsed / 1024 / 1024);
+    const heapTotalMB = Math.round(memoryUsage.heapTotal / 1024 / 1024);
+    
+    return {
+      heap_used_mb: heapUsedMB,
+      heap_total_mb: heapTotalMB,
+      status: heapUsedMB < 500 ? 'normal' : 'high',
+      usage_percentage: Math.round((heapUsedMB / heapTotalMB) * 100)
+    };
+  }
+
+  private formatSummary(statusData: any): string {
+    const uptime = Math.round(statusData.server.uptime);
+    const memory = statusData.health.memory;
+    const stats = statusData.usage_statistics;
+    
+    return `{{PROJECT_NAME}} Server Status Summary
+
+Server: ${statusData.server.name} v${statusData.server.version}
+Uptime: ${uptime} seconds
+Health: ${statusData.health.status}
+Memory: ${memory.heap_used_mb}MB used (${memory.usage_percentage}%)
+
+Usage Statistics:
+- Tool calls: ${stats.tool_calls}
+- Resource access: ${stats.resource_access}
+- Prompt executions: ${stats.prompt_executions}
+- Elicitation sessions: ${stats.elicitation_sessions}
+- Sampling operations: ${stats.sampling_operations}
+
+Capabilities: Tools, Resources, Prompts, Elicitations, Sampling, Streaming
+Status: ${statusData.health.status} at ${statusData.server.timestamp}`;
+  }
+}

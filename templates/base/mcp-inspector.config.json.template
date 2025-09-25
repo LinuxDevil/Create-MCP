@@ -1,0 +1,29 @@
+{
+  "mcpServers": {
+    "{{PROJECT_NAME}}": {
+      "type": "stdio",
+      "command": "tsx",
+      "args": ["src/server.ts"],
+      "env": {
+        "NODE_ENV": "development",
+        "LOG_LEVEL": "debug"
+      }
+    },
+    "{{PROJECT_NAME}}-built": {
+      "type": "stdio", 
+      "command": "node",
+      "args": ["dist/server.js"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    },
+    "{{PROJECT_NAME}}-http": {
+      "type": "streamable-http",
+      "url": "http://localhost:3000/mcp"
+    },
+    "{{PROJECT_NAME}}-sse": {
+      "type": "sse",
+      "url": "http://localhost:3000/sse"
+    }
+  }
+}

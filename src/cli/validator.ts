@@ -87,29 +87,3 @@ export function validateDescription(description: string): ValidationResult {
 
   return { isValid: true };
 }
-    'server',
-    'test',
-    'example'
-  ];
-
-  if (reservedNames.includes(name.toLowerCase())) {
-    return {
-      isValid: false,
-      error: `"${name}" is a reserved name and cannot be used`
-    };
-  }
-
-  // Check if directory already exists
-  const projectPath = path.resolve(process.cwd(), name);
-  if (fs.existsSync(projectPath)) {
-    const files = fs.readdirSync(projectPath);
-    if (files.length > 0) {
-      return {
-        isValid: false,
-        error: `Directory "${name}" already exists and is not empty`
-      };
-    }
-  }
-
-  return { isValid: true };
-}

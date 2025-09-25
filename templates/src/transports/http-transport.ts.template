@@ -1,0 +1,384 @@
+/**
+ * HTTP Transport Handler for {{PROJECT_NAME}}
+ * Handles HTTP communication with streaming support for browser clients
+ */
+
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import express, { Application, Request, Response } from "express";
+import cors from "cors";
+import { randomUUID } from "node:crypto";
+import { {{PROJECT_NAME_PASCAL}}McpServer } from "../core/mcp-server.js";
+import { ConfigManager } from "../core/config.js";
+import { logger } from "../utils/logger.js";
+
+export class HttpTransportHandler {
+  private server: {{PROJECT_NAME_PASCAL}}McpServer;
+  private app: Application;
+  private configManager: ConfigManager;
+  private isRunning = false;
+  private httpServer: any = null;
+  private transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+  private sessionCount = 0;
+
+  constructor(server: {{PROJECT_NAME_PASCAL}}McpServer) {
+    this.server = server;
+    this.configManager = ConfigManager.getInstance();
+    this.app = express();
+    this.setupMiddleware();
+    this.setupRoutes();
+  }
+
+  /**
+   * Setup Express middleware
+   */
+  private setupMiddleware(): void {
+    const config = this.configManager.getServerConfig();
+    const transportConfig = this.configManager.getTransportConfig();
+
+    // JSON parsing
+    this.app.use(express.json());
+
+    // CORS configuration
+    if (transportConfig.enableCors) {
+      this.app.use(cors({
+        origin: config.allowedOrigins,
+        credentials: true,
+        methods: ['GET', 'POST', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'x-session-id']
+      }));
+    }
+
+    // Request logging
+    this.app.use((req, res, next) => {
+      logger.debug(`${req.method} ${req.url}`, {
+        sessionId: req.headers['x-session-id'],
+        userAgent: req.headers['user-agent']
+      });
+      next();
+    });
+  }
+
+  /**
+   * Setup Express routes
+   */
+  private setupRoutes(): void {
+    // Main MCP endpoint
+    this.app.post('/mcp', async (req: Request, res: Response) => {
+      await this.handleMcpRequest(req, res);
+    });
+
+    // Health check endpoint
+    this.app.get('/health', async (req: Request, res: Response) => {
+      await this.handleHealthCheck(req, res);
+    });
+
+    // Server info endpoint
+    this.app.get('/info', async (req: Request, res: Response) => {
+      await this.handleServerInfo(req, res);
+    });
+
+    // Sessions endpoint (for monitoring)
+    this.app.get('/sessions', async (req: Request, res: Response) => {
+      await this.handleSessionsInfo(req, res);
+    });
+
+    // Default error handler
+    this.app.use((error: Error, req: Request, res: Response, next: any) => {
+      logger.error('Express error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: error.message
+      });
+    });
+  }
+
+  /**
+   * Handle MCP requests
+   */
+  private async handleMcpRequest(req: Request, res: Response): Promise<void> {
+    const config = this.configManager.getServerConfig();
+
+    if (config.stateless) {
+      await this.handleStatelessRequest(req, res);
+    } else {
+      await this.handleStatefulRequest(req, res);
+    }
+  }
+
+  /**
+   * Handle stateless MCP requests
+   */
+  private async handleStatelessRequest(req: Request, res: Response): Promise<void> {
+    try {
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+      });
+
+      res.on('close', () => {
+        transport.close();
+      });
+
+      await this.server.getMcpServer().connect(transport);
+      await transport.handleRequest(req, res, req.body);
+
+    } catch (error) {
+      logger.error('Stateless request failed:', error);
+      res.status(500).json({
+        jsonrpc: '2.0',
+        error: { code: -32603, message: 'Internal error' },
+        id: null,
+      });
+    }
+  }
+
+  /**
+   * Handle stateful MCP requests
+   */
+  private async handleStatefulRequest(req: Request, res: Response): Promise<void> {
+    const config = this.configManager.getServerConfig();
+    const sessionId = req.headers['x-session-id'] as string;
+    let transport: StreamableHTTPServerTransport;
+
+    try {
+      if (sessionId && this.transports[sessionId]) {
+        transport = this.transports[sessionId];
+        logger.debug(`Reusing session: ${sessionId}`);
+      } else if (!sessionId && isInitializeRequest(req.body)) {
+        logger.info("Creating new session for initialize request");
+        this.sessionCount++;
+
+        transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          enableDnsRebindingProtection: config.enableDnsProtection,
+          allowedHosts: config.allowedHosts,
+          allowedOrigins: config.allowedOrigins,
+          onsessioninitialized: (newSessionId) => {
+            this.transports[newSessionId] = transport;
+            logger.info(`New session initialized: ${newSessionId}`);
+          }
+        });
+
+        transport.onclose = () => {
+          if (transport.sessionId) {
+            delete this.transports[transport.sessionId];
+            this.sessionCount--;
+            logger.info(`Session closed: ${transport.sessionId}`);
+          }
+        };
+
+        await this.server.getMcpServer().connect(transport);
+      } else {
+        logger.warn(`Invalid request: sessionId=${sessionId}`);
+        res.status(400).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32000,
+            message: 'Bad Request: No valid session ID provided',
+          },
+          id: null,
+        });
+        return;
+      }
+
+      await transport.handleRequest(req, res, req.body);
+
+    } catch (error) {
+      logger.error('Request handling failed:', error);
+      res.status(500).json({
+        jsonrpc: '2.0',
+        error: { code: -32603, message: 'Internal error' },
+        id: null,
+      });
+    }
+  }
+
+  /**
+   * Handle health check requests
+   */
+  private async handleHealthCheck(req: Request, res: Response): Promise<void> {
+    try {
+      const health = await this.server.getHealthChecker().getStatus();
+      const serverStatus = await this.server.getStatus();
+
+      res.json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        server: {
+          name: serverStatus.name,
+          version: serverStatus.version,
+          uptime: serverStatus.uptime
+        },
+        transport: {
+          type: 'http',
+          sessions: Object.keys(this.transports).length,
+          mode: this.configManager.getServerConfig().stateless ? 'stateless' : 'stateful'
+        },
+        checks: health
+      });
+    } catch (error) {
+      logger.error('Health check failed:', error);
+      res.status(500).json({
+        status: 'unhealthy',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * Handle server info requests
+   */
+  private async handleServerInfo(req: Request, res: Response): Promise<void> {
+    try {
+      const status = await this.server.getStatus();
+      const config = this.configManager.getServerConfig();
+
+      res.json({
+        name: status.name,
+        version: status.version,
+        description: "{{PROJECT_DESCRIPTION}}",
+        transport: {
+          type: 'streamable-http',
+          version: '2025-03-26',
+          features: ['sse', 'session-management']
+        },
+        endpoints: {
+          mcp: '/mcp',
+          health: '/health',
+          info: '/info',
+          sessions: '/sessions'
+        },
+        capabilities: status.capabilities,
+        sessions: config.stateless ? 'stateless' : Object.keys(this.transports).length,
+        mode: config.stateless ? 'stateless' : 'stateful',
+        uptime: status.uptime,
+        stats: status.stats
+      });
+    } catch (error) {
+      logger.error('Server info request failed:', error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * Handle sessions info requests
+   */
+  private async handleSessionsInfo(req: Request, res: Response): Promise<void> {
+    try {
+      const config = this.configManager.getServerConfig();
+
+      if (config.stateless) {
+        res.json({
+          mode: 'stateless',
+          message: 'Session tracking not available in stateless mode'
+        });
+        return;
+      }
+
+      const sessions = Object.keys(this.transports).map(sessionId => ({
+        id: sessionId,
+        created: new Date().toISOString(), // This would need to be tracked properly
+        active: true
+      }));
+
+      res.json({
+        mode: 'stateful',
+        total: sessions.length,
+        sessions
+      });
+    } catch (error) {
+      logger.error('Sessions info request failed:', error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * Start the HTTP transport
+   */
+  public async start(port: number = 3000): Promise<void> {
+    if (this.isRunning) {
+      logger.warn("HTTP transport already running");
+      return;
+    }
+
+    return new Promise((resolve, reject) => {
+      try {
+        this.httpServer = this.app.listen(port, () => {
+          this.isRunning = true;
+          logger.info(`MCP server listening on http://localhost:${port}`);
+          logger.info('Available endpoints:');
+          logger.info('  POST /mcp - MCP communication');
+          logger.info('  GET /health - Health check');
+          logger.info('  GET /info - Server information');
+          logger.info('  GET /sessions - Session information');
+          
+          const config = this.configManager.getServerConfig();
+          logger.info(`Mode: ${config.stateless ? 'stateless' : 'stateful'}`);
+          
+          resolve();
+        });
+
+        this.httpServer.on('error', (error: Error) => {
+          logger.error('HTTP server error:', error);
+          reject(error);
+        });
+
+      } catch (error) {
+        logger.error('Failed to start HTTP transport:', error);
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Stop the HTTP transport
+   */
+  public async stop(): Promise<void> {
+    if (!this.isRunning || !this.httpServer) {
+      logger.warn("HTTP transport not running");
+      return;
+    }
+
+    return new Promise((resolve) => {
+      logger.info("Stopping HTTP transport...");
+
+      // Close all active sessions
+      Object.values(this.transports).forEach(transport => {
+        transport.close();
+      });
+      this.transports = {};
+      this.sessionCount = 0;
+
+      // Close HTTP server
+      this.httpServer.close(() => {
+        this.isRunning = false;
+        this.httpServer = null;
+        logger.info("HTTP transport stopped");
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Check if the transport is running
+   */
+  public isActive(): boolean {
+    return this.isRunning;
+  }
+
+  /**
+   * Get transport status information
+   */
+  public getStatus(): any {
+    return {
+      type: 'http',
+      running: this.isRunning,
+      sessions: Object.keys(this.transports).length,
+      mode: this.configManager.getServerConfig().stateless ? 'stateless' : 'stateful'
+    };
+  }
+}

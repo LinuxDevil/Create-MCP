@@ -1,0 +1,124 @@
+/**
+ * Stdio Transport Handler for {{PROJECT_NAME}}
+ * Handles standard input/output communication for command-line integration
+ */
+
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { {{PROJECT_NAME_PASCAL}}McpServer } from "../core/mcp-server.js";
+import { logger } from "../utils/logger.js";
+
+export class StdioTransportHandler {
+  private server: {{PROJECT_NAME_PASCAL}}McpServer;
+  private transport: StdioServerTransport | null = null;
+  private isConnected = false;
+
+  constructor(server: {{PROJECT_NAME_PASCAL}}McpServer) {
+    this.server = server;
+  }
+
+  /**
+   * Start the stdio transport
+   */
+  public async start(): Promise<void> {
+    if (this.isConnected) {
+      logger.warn("Stdio transport already started");
+      return;
+    }
+
+    logger.info("Starting MCP server with Stdio transport...");
+
+    try {
+      this.transport = new StdioServerTransport();
+      await this.server.getMcpServer().connect(this.transport);
+      this.isConnected = true;
+
+      logger.info("MCP server running on Stdio transport");
+      logger.info("Server ready to receive commands via stdin/stdout");
+
+      // Setup cleanup handlers
+      this.setupCleanupHandlers();
+
+    } catch (error) {
+      logger.error("Failed to start stdio transport:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Stop the stdio transport
+   */
+  public async stop(): Promise<void> {
+    if (!this.isConnected || !this.transport) {
+      logger.warn("Stdio transport not running");
+      return;
+    }
+
+    logger.info("Stopping stdio transport...");
+
+    try {
+      // Close the transport
+      this.transport.close();
+      this.transport = null;
+      this.isConnected = false;
+
+      logger.info("Stdio transport stopped");
+    } catch (error) {
+      logger.error("Error stopping stdio transport:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if the transport is connected
+   */
+  public isRunning(): boolean {
+    return this.isConnected;
+  }
+
+  /**
+   * Get transport status information
+   */
+  public getStatus(): any {
+    return {
+      type: 'stdio',
+      connected: this.isConnected,
+      transport: this.transport ? 'active' : 'inactive'
+    };
+  }
+
+  /**
+   * Setup cleanup handlers for graceful shutdown
+   */
+  private setupCleanupHandlers(): void {
+    // Handle process termination signals
+    const cleanup = async (signal: string) => {
+      logger.info(`Received ${signal}, cleaning up stdio transport...`);
+      try {
+        await this.stop();
+        await this.server.shutdown();
+      } catch (error) {
+        logger.error("Error during cleanup:", error);
+      }
+    };
+
+    process.on('SIGINT', () => cleanup('SIGINT'));
+    process.on('SIGTERM', () => cleanup('SIGTERM'));
+
+    // Handle stdin end
+    process.stdin.on('end', () => {
+      logger.info("Stdin ended, shutting down...");
+      cleanup('STDIN_END');
+    });
+
+    // Handle uncaught exceptions
+    process.on('uncaughtException', (error) => {
+      logger.error('Uncaught exception in stdio transport:', error);
+      cleanup('UNCAUGHT_EXCEPTION').then(() => process.exit(1));
+    });
+
+    process.on('unhandledRejection', (reason, promise) => {
+      logger.error('Unhandled rejection in stdio transport:', promise, 'reason:', reason);
+      cleanup('UNHANDLED_REJECTION').then(() => process.exit(1));
+    });
+  }
+}

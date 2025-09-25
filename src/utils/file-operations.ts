@@ -1,81 +1,85 @@
 import fs from 'fs-extra';
 import path from 'path';
-import { CreateMcpOptions } from '../types/index.js';
+import { fileURLToPath } from 'url';
 
-export async function copyTemplateFiles(config: CreateMcpOptions, projectPath: string): Promise<void> {
-  const templatesDir = path.join(__dirname, '../../templates');
-  
-  // Copy base template files
-  const baseTemplatesDir = path.join(templatesDir, 'base');
-  if (await fs.pathExists(baseTemplatesDir)) {
-    await fs.copy(baseTemplatesDir, projectPath);
-  }
-  
-  // Copy source template files
-  const srcTemplatesDir = path.join(templatesDir, 'src');
-  if (await fs.pathExists(srcTemplatesDir)) {
-    await fs.copy(srcTemplatesDir, path.join(projectPath, 'src'));
-  }
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-  // Remove unused transport examples if needed
-  await removeUnusedTransportCode(config, projectPath);
+export async function ensureDirectoryExists(dirPath: string): Promise<void> {
+  try {
+    await fs.ensureDir(dirPath);
+  } catch (error) {
+    throw new Error(`Failed to create directory ${dirPath}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
-async function removeUnusedTransportCode(config: CreateMcpOptions, projectPath: string): Promise<void> {
-  const serverTemplatePath = path.join(projectPath, 'src/server.ts.template');
-  
-  if (await fs.pathExists(serverTemplatePath)) {
-    let serverContent = await fs.readFile(serverTemplatePath, 'utf-8');
+export async function copyDirectory(srcDir: string, destDir: string): Promise<void> {
+  try {
+    await fs.copy(srcDir, destDir, {
+      overwrite: true,
+      errorOnExist: false
+    });
+  } catch (error) {
+    throw new Error(`Failed to copy directory from ${srcDir} to ${destDir}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
 
-    if (config.transportTypes === 'stdio') {
-      serverContent = removeHttpTransportCode(serverContent);
-    } else if (config.transportTypes === 'http') {
-      serverContent = removeStdioTransportCode(serverContent);
+export function getTemplatesDirectory(): string {
+  // Go up from src/utils/ to project root, then to templates/
+  return path.join(__dirname, '..', '..', 'templates');
+}
+
+export async function validateTemplatesDirectory(): Promise<void> {
+  const templatesDir = getTemplatesDirectory();
+  
+  if (!(await fs.pathExists(templatesDir))) {
+    throw new Error(`Templates directory not found: ${templatesDir}`);
+  }
+  
+  const baseDir = path.join(templatesDir, 'base');
+  const srcDir = path.join(templatesDir, 'src');
+  
+  if (!(await fs.pathExists(baseDir))) {
+    throw new Error(`Base templates directory not found: ${baseDir}`);
+  }
+  
+  if (!(await fs.pathExists(srcDir))) {
+    throw new Error(`Source templates directory not found: ${srcDir}`);
+  }
+}
+
+export function formatFileSize(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let size = bytes;
+  let unitIndex = 0;
+  
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex++;
+  }
+  
+  return `${Math.round(size * 100) / 100} ${units[unitIndex]}`;
+}
+
+export async function getDirectorySize(dirPath: string): Promise<number> {
+  let totalSize = 0;
+  
+  try {
+    const items = await fs.readdir(dirPath, { withFileTypes: true });
+    
+    for (const item of items) {
+      const itemPath = path.join(dirPath, item.name);
+      
+      if (item.isFile()) {
+        const stats = await fs.stat(itemPath);
+        totalSize += stats.size;
+      } else if (item.isDirectory() && item.name !== 'node_modules' && item.name !== '.git') {
+        totalSize += await getDirectorySize(itemPath);
+      }
     }
-
-    await fs.writeFile(serverTemplatePath, serverContent);
+  } catch (error) {
+    // Ignore errors for individual files/directories
   }
-}
-
-function removeHttpTransportCode(content: string): string {
-  // Remove HTTP-specific imports
-  content = content.replace(/import.*StreamableHTTPServerTransport.*\n/g, '');
-  content = content.replace(/import.*express.*\n/g, '');
-  content = content.replace(/import.*randomUUID.*\n/g, '');
   
-  // Remove HTTP transport method and related code
-  const httpMethodRegex = /\/\*\*[\s\S]*?Start the server with HTTP transport[\s\S]*?\*\/[\s\S]*?async startHttp\([\s\S]*?\n  \}/g;
-  content = content.replace(httpMethodRegex, '');
-  
-  // Remove HTTP case from main function
-  content = content.replace(/case 'http':[\s\S]*?break;/g, '');
-  
-  return content;
-}
-
-function removeStdioTransportCode(content: string): string {
-  // Remove Stdio-specific imports
-  content = content.replace(/import.*StdioServerTransport.*\n/g, '');
-  
-  // Remove Stdio transport method
-  const stdioMethodRegex = /\/\*\*[\s\S]*?Start the server with Stdio transport[\s\S]*?\*\/[\s\S]*?async startStdio\([\s\S]*?\n  \}/g;
-  content = content.replace(stdioMethodRegex, '');
-  
-  // Remove Stdio case from main function
-  content = content.replace(/case 'stdio':[\s\S]*?break;/g, '');
-  
-  return content;
-}
-
-export async function ensureDirectoryStructure(projectPath: string): Promise<void> {
-  const directories = [
-    'src',
-    'src/services',
-    'src/utils',
-    'dist'
-  ];
-
-  for (const dir of directories) {
-    await fs.ensureDir(path.join(projectPath, dir));
-  }
+  return totalSize;
 }

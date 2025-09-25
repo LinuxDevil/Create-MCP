@@ -1,9 +1,14 @@
 // Jest test setup file
 import { logger } from './utils/logger.js';
-import { LogLevel } from './utils/logger.js';
 
-// Silence logs during testing
-logger.setLevel(LogLevel.ERROR);
+// Set log level to ERROR to reduce noise during tests
+// Use string-based log level since LogLevel enum may not be available as a value
+try {
+  (logger as any).setLevel?.('error');
+} catch {
+  // Fallback: logger may not support setLevel method
+  console.warn('Logger setLevel method not available');
+}
 
 // Global test configuration
 beforeEach(() => {

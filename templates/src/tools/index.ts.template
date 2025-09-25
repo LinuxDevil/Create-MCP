@@ -1,0 +1,136 @@
+/**
+ * Tool Registry for {{PROJECT_NAME}}
+ * Centralized registration and management of all MCP tools
+ */
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { logger } from "../utils/logger.js";
+import { DataAnalysisTool } from "./data-analysis-tool.js";
+import { ServerStatusTool } from "./server-status-tool.js";
+
+export interface ToolStats {
+  toolCalls: number;
+  resourceAccess: number;
+  promptExecutions: number;
+  elicitationSessions: number;
+  samplingOperations: number;
+}
+
+export interface BaseTool {
+  name: string;
+  register(server: McpServer, stats: ToolStats): void;
+}
+
+export class ToolRegistry {
+  private server: McpServer;
+  private stats: ToolStats;
+  private tools: Map<string, BaseTool> = new Map();
+
+  constructor(server: McpServer, stats: ToolStats) {
+    this.server = server;
+    this.stats = stats;
+    this.initializeTools();
+  }
+
+  /**
+   * Initialize all available tools
+   */
+  private initializeTools(): void {
+    // Comprehensive Data Analysis Tool - demonstrates all capabilities
+    this.tools.set('data-analysis', new DataAnalysisTool());
+    
+    // Server monitoring and status
+    this.tools.set('server-status', new ServerStatusTool());
+
+    logger.debug(`Initialized ${this.tools.size} tools`);
+  }
+
+  /**
+   * Register all tools with the MCP server
+   */
+  public registerAllTools(): void {
+    logger.debug("Registering tools with MCP server...");
+
+    let registeredCount = 0;
+    for (const [name, tool] of this.tools) {
+      try {
+        tool.register(this.server, this.stats);
+        registeredCount++;
+        logger.debug(`Registered tool: ${name}`);
+      } catch (error) {
+        logger.error(`Failed to register tool ${name}:`, error);
+      }
+    }
+
+    logger.info(`Successfully registered ${registeredCount}/${this.tools.size} tools`);
+  }
+
+  /**
+   * Register a specific tool
+   */
+  public registerTool(name: string): boolean {
+    const tool = this.tools.get(name);
+    if (!tool) {
+      logger.error(`Tool not found: ${name}`);
+      return false;
+    }
+
+    try {
+      tool.register(this.server, this.stats);
+      logger.info(`Tool registered: ${name}`);
+      return true;
+    } catch (error) {
+      logger.error(`Failed to register tool ${name}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Add a new tool to the registry
+   */
+  public addTool(name: string, tool: BaseTool): void {
+    if (this.tools.has(name)) {
+      logger.warn(`Tool ${name} already exists, overwriting`);
+    }
+
+    this.tools.set(name, tool);
+    logger.debug(`Added tool to registry: ${name}`);
+  }
+
+  /**
+   * Remove a tool from the registry
+   */
+  public removeTool(name: string): boolean {
+    const removed = this.tools.delete(name);
+    if (removed) {
+      logger.debug(`Removed tool from registry: ${name}`);
+    } else {
+      logger.warn(`Tool not found in registry: ${name}`);
+    }
+    return removed;
+  }
+
+  /**
+   * Get list of available tools
+   */
+  public getAvailableTools(): string[] {
+    return Array.from(this.tools.keys());
+  }
+
+  /**
+   * Get tool information
+   */
+  public getToolInfo(): Array<{ name: string; registered: boolean }> {
+    return Array.from(this.tools.keys()).map(name => ({
+      name,
+      registered: true // In this implementation, tools are registered when added
+    }));
+  }
+
+  /**
+   * Get tool statistics
+   */
+  public getToolStats(): ToolStats {
+    return { ...this.stats };
+  }
+}

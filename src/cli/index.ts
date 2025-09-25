@@ -36,6 +36,12 @@ program
   .option('--package-manager <pm>', 'package manager to use (npm|yarn|pnpm)')
   .option('--skip-install', 'skip dependency installation')
   .option('--verbose', 'enable verbose logging')
+  .option('--oauth', 'enable OAuth authentication for HTTP transport')
+  .option('--no-dns-protection', 'disable DNS rebinding protection')
+  .option('--stateless', 'enable stateless mode (no session persistence)')
+  .option('--no-llm-sampling', 'exclude LLM sampling examples')
+  .option('--no-dynamic-tools', 'exclude dynamic tool management examples')
+  .option('--no-elicitation', 'exclude user input elicitation examples')
   .action(async (projectName: string, options: Partial<CreateMcpOptions>) => {
     try {
       // Print welcome message
