@@ -44,3 +44,37 @@ export interface TemplateVariables {
   PACKAGE_MANAGER?: string;
   [key: string]: string | undefined;
 }
+
+export type ComponentType = 'tool' | 'resource' | 'prompt' | 'service' | 'transport' | 'util';
+
+export interface AddComponentOptions {
+  componentType: ComponentType;
+  componentName: string;
+  description?: string;
+  author?: string;
+  verbose?: boolean;
+  skipValidation?: boolean;
+}
+
+export interface ProjectContext {
+  isValidProject: boolean;
+  projectPath: string;
+  packageJson?: any;
+  srcPath: string;
+  projectName: string;
+}
+
+export interface ComponentTemplate {
+  componentType: ComponentType;
+  templateContent: string;
+  indexUpdateContent: string;
+  requiredImports: string[];
+  registryUpdates: RegistryUpdate[];
+}
+
+export interface RegistryUpdate {
+  registryType: 'tool' | 'resource' | 'prompt';
+  addImport: string;
+  addInitialization: string;
+  addRegistration: string;
+}

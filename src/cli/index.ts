@@ -7,7 +7,10 @@ import { validateProjectName } from './validator.js';
 import { runPrompts } from './prompts.js';
 import { generateProject } from './generator.js';
 import { checkForUpdates, detectPackageManager } from '../utils/package-manager.js';
-import { CreateMcpOptions } from '../types/index.js';
+import { CreateMcpOptions, ComponentType, AddComponentOptions } from '../types/index.js';
+import { runAddComponentPrompts, confirmComponentConfig } from './add-prompts.js';
+import { addComponent, listExistingComponents } from './add-component.js';
+import { validateComponentName } from '../utils/project-detector.js';
 
 const program = new Command();
 
@@ -115,6 +118,98 @@ program
     }
   });
 
+program
+  .command('add')
+  .description('Add a new component to an existing MCP server project')
+  .argument('[component-type]', 'type of component (tool|resource|prompt|service|transport|util)')
+  .argument('[component-name]', 'name of the component')
+  .option('-d, --description <desc>', 'component description')
+  .option('-a, --author <author>', 'component author')
+  .option('--skip-validation', 'skip component name validation')
+  .option('--verbose', 'enable verbose logging')
+  .action(async (componentType?: string, componentName?: string, options: any = {}) => {
+    try {
+      if (options.verbose) {
+        process.env.VERBOSE = 'true';
+      }
+
+      console.log(chalk.blue.bold('🔧 Adding MCP Component\n'));
+
+      const validTypes: ComponentType[] = ['tool', 'resource', 'prompt', 'service', 'transport', 'util'];
+      let validatedType: ComponentType | undefined;
+
+      if (componentType) {
+        if (!validTypes.includes(componentType as ComponentType)) {
+          console.error(chalk.red(`❌ Invalid component type: ${componentType}`));
+          console.log(chalk.gray('Valid types: ' + validTypes.join(', ')));
+          process.exit(1);
+        }
+        validatedType = componentType as ComponentType;
+      }
+
+      if (componentName && validatedType && !options.skipValidation) {
+        const validation = validateComponentName(componentName, validatedType);
+        if (!validation.isValid) {
+          console.error(chalk.red(`❌ Invalid component name: ${validation.error}`));
+          process.exit(1);
+        }
+      }
+
+      const componentConfig = await runAddComponentPrompts(
+        validatedType,
+        componentName,
+        {
+          description: options.description,
+          author: options.author,
+          verbose: options.verbose,
+          skipValidation: options.skipValidation,
+        }
+      );
+
+      const confirmed = await confirmComponentConfig(componentConfig);
+      if (!confirmed) {
+        console.log(chalk.yellow('❌ Component creation cancelled'));
+        process.exit(0);
+      }
+
+      await addComponent(componentConfig);
+      console.log(chalk.green.bold('\n🎉 Component added successfully!'));
+    } catch (error) {
+      console.error(chalk.red(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      
+      if (options.verbose && error instanceof Error) {
+        console.error(chalk.red('\nStack trace:'));
+        console.error(chalk.gray(error.stack || 'No stack trace available'));
+      }
+      
+      process.exit(1);
+    }
+  });
+
+program
+  .command('list')
+  .description('List existing components in the current MCP server project')
+  .option('--verbose', 'enable verbose logging')
+  .action(async (options: any = {}) => {
+    try {
+      if (options.verbose) {
+        process.env.VERBOSE = 'true';
+      }
+
+      await listExistingComponents();
+
+    } catch (error) {
+      console.error(chalk.red(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      
+      if (options.verbose && error instanceof Error) {
+        console.error(chalk.red('\nStack trace:'));
+        console.error(chalk.gray(error.stack || 'No stack trace available'));
+      }
+      
+      process.exit(1);
+    }
+  });
+
 program.addHelpText('after', `
 Examples:
   $ npx create-mcp my-mcp-server
@@ -122,10 +217,29 @@ Examples:
   $ npx create-mcp my-server --transport stdio --no-examples
   $ npx create-mcp my-server --package-manager yarn --skip-install
 
+  # Add components to existing projects
+  $ npx mcp-server-generator add tool my-custom-tool
+  $ npx mcp-server-generator add resource user-data
+  $ npx mcp-server-generator add prompt analysis-prompt
+  $ npx mcp-server-generator add service data-processor
+  $ npx mcp-server-generator add transport websocket-transport
+  $ npx mcp-server-generator add util string-helpers
+
+  # List existing components
+  $ npx mcp-server-generator list
+
 Transport Types:
   stdio  - Standard input/output (for CLI tools and direct integrations)
   http   - HTTP server (for web services and remote integrations)  
   both   - Include both transport examples (recommended)
+
+Component Types:
+  tool      - Add functionality and tools to your MCP server
+  resource  - Add data and documentation resources
+  prompt    - Add intelligent prompt templates
+  service   - Add business logic and processing services
+  transport - Add custom communication transports
+  util      - Add helper functions and utilities
 
 For more information, visit: https://modelcontextprotocol.io
 `);
