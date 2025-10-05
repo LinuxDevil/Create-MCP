@@ -1,0 +1,187 @@
+# Technical Design: MCP | Create example MCP to create a system design for the JIRA ticket 
+
+**Ticket:** AIR-9958
+**Type:** Idea
+**Priority:** Medium
+**Status:** Closed
+**Assignee:** Unassigned
+
+---
+
+I'll create a technical design that aligns with the existing codebase patterns.
+
+## 1. Overview
+Create an example MCP template that demonstrates how to generate system designs for JIRA tickets using the mcp-server-generator. This will provide developers with a standardized way to create technical specifications using MCP's capabilities, integrated with JIRA workflows.
+
+## 2. Architecture Approach
+The implementation will follow the existing clean architecture pattern shown in the codebase:
+- Use the existing prompts system from `src/cli/prompts.ts`
+- Extend the component generation system shown in `src/cli/add-prompts.ts`
+- Follow the template pattern seen in `templates/src/server.ts.template`
+
+## 3. Key Components
+
+1. New Template Files:
+```
+templates/
+  └── examples/
+      ├── jira-design-tool.ts.template
+      ├── jira-design-resource.ts.template
+      └── jira-design-prompt.ts.template
+```
+
+2. Modified Files:
+- `src/helpers/examples.ts` - Add JIRA design example
+- `src/cli/prompts.ts` - Add JIRA-specific options
+- `README.md` - Document new functionality
+
+## 4. Implementation Steps
+
+1. Add JIRA Design Tool Template:
+
+```typescript
+// templates/examples/jira-design-tool.ts.template
+import { Tool, ToolResult } from '@mcp/core';
+
+export class JiraDesignTool implements Tool {
+  name = 'jira-design-generator';
+  description = 'Generates technical designs for JIRA tickets';
+
+  async execute(input: string): Promise<ToolResult> {
+    const sections = [
+      'Overview',
+      'Architecture Approach', 
+      'Key Components',
+      'Implementation Steps',
+      'Integration Points',
+      'Potential Risks',
+      'Testing Strategy'
+    ];
+
+    // Implementation following existing patterns
+    return {
+      success: true,
+      output: {
+        design: sections.map(section => ({
+          title: section,
+          content: `Generated content for ${section}`
+        }))
+      }
+    };
+  }
+}
+```
+
+2. Extend Prompts:
+
+```typescript
+// src/cli/prompts.ts
+export async function runPrompts(
+  projectName: string, 
+  initialOptions: Partial<CreateMcpOptions>
+): Promise<CreateMcpOptions> {
+  // Add to existing prompts
+  const answers = await inquirer.prompt([
+    // ... existing prompts ...
+    {
+      type: 'confirm',
+      name: 'includeJiraDesign',
+      message: 'Include JIRA design generation examples?',
+      default: true,
+      when: (answers: any) => initialOptions.includeJiraDesign === undefined 
+        && (initialOptions.includeExamples !== false && answers.includeExamples !== false),
+    }
+  ]);
+}
+```
+
+3. Add Helper Functions:
+
+```typescript
+// src/helpers/examples.ts
+export function generateJiraDesignExample(options: CreateMcpOptions): string {
+  return `
+import { JiraDesignTool } from './tools/jira-design-tool';
+import { JiraDesignResource } from './resources/jira-design-resource';
+
+export const jiraDesignTool = new JiraDesignTool();
+export const jiraDesignResource = new JiraDesignResource();
+  `;
+}
+```
+
+## 5. Integration Points
+
+1. Update Generator Logic:
+```typescript
+// src/cli/generator.ts
+async function generateExamples(config: CreateMcpOptions) {
+  if (config.includeJiraDesign) {
+    await copyTemplate(
+      'examples/jira-design-tool.ts.template',
+      'src/tools/jira-design-tool.ts'
+    );
+    // Add other template copies
+  }
+}
+```
+
+2. Extend Types:
+```typescript
+// src/types/index.ts
+export interface CreateMcpOptions {
+  // ... existing options ...
+  includeJiraDesign?: boolean;
+}
+```
+
+## 6. Potential Risks
+
+1. JIRA API Integration:
+- Handle authentication failures gracefully
+- Consider rate limiting
+- Validate JIRA ticket format
+
+2. Template Generation:
+- Ensure generated designs follow company standards
+- Handle edge cases in ticket data
+- Consider concurrent generation requests
+
+## 7. Testing Strategy
+
+1. Unit Tests:
+```typescript
+// tests/tools/jira-design-tool.test.ts
+describe('JiraDesignTool', () => {
+  it('should generate valid design structure', async () => {
+    const tool = new JiraDesignTool();
+    const result = await tool.execute('AIR-9958');
+    
+    expect(result.success).toBe(true);
+    expect(result.output.design).toHaveLength(7); // 7 sections
+  });
+});
+```
+
+2. Integration Tests:
+```typescript
+// tests/integration/jira-design.test.ts
+describe('JIRA Design Integration', () => {
+  it('should generate complete design document', async () => {
+    const server = new McpServer();
+    const result = await server.execute('generate-design', {
+      ticketId: 'AIR-9958'
+    });
+    
+    expect(result).toMatchSnapshot();
+  });
+});
+```
+
+This design follows the existing patterns in the codebase while adding new functionality for JIRA design generation. It maintains the clean architecture and modularity shown in the original code.
+
+---
+
+**Generated by:** Jira Tech Design Agent
+**Date:** 2025-10-05T19:04:41.047Z
+**Token Usage:** 5480 tokens
